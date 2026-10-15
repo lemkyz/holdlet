@@ -20,6 +20,8 @@ jobs:
         run: ./scripts/test.sh
       - name: Build app
         run: ./scripts/build-app.sh
+      - name: Normal app startup smoke test
+        run: ./scripts/smoke-app.sh
       - name: Verify bundle
         run: |
           plutil -lint dist/Holdlet.app/Contents/Info.plist

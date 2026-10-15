@@ -34,7 +34,10 @@ final class AppState: ObservableObject {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let folder = support.appendingPathComponent(demoInstance ? "Holdlet-Demo" : "Holdlet")
         disk = SnapshotStore(url: folder.appendingPathComponent("state-v1.json"))
-        notifications = NotificationService(defaults: UserDefaults(suiteName: demoInstance ? "io.github.lemkyz.holdlet.demo" : "io.github.lemkyz.holdlet")!)
+        // Foundation may reject using the current application's domain as a named suite.
+        // The normal app must use .standard; named suites are only for isolated demos.
+        let defaults = demoInstance ? (UserDefaults(suiteName: "io.github.lemkyz.holdlet.demo") ?? .standard) : .standard
+        notifications = NotificationService(defaults: defaults)
         do { snapshot = demoInstance ? Snapshot() : try disk.load() }
         catch { snapshot = Snapshot(); self.error = "Saved data could not be read. The original file is preserved. Open Settings → Diagnostics."; readOnly = true }
         if demoInstance { snapshot.preferences.demoMode = true; snapshot.preferences.onboardingComplete = true }

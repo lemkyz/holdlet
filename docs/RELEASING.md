@@ -5,10 +5,13 @@
 ```bash
 ./scripts/test.sh
 ./scripts/build-app.sh
+./scripts/smoke-app.sh
 codesign --verify --deep --strict --verbose=2 dist/Holdlet.app
 ```
 
 The default ad-hoc signature supports local development, not trusted public distribution. `scripts/build-app.sh` builds the current host architecture. Do not label a single-architecture artifact universal.
+
+Run the startup smoke test on a clean test account or CI runner. It initializes normal app state (not demo state), so it should not be used as an isolation boundary for an existing connected profile.
 
 ## Developer ID distribution
 

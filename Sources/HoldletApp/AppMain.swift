@@ -45,6 +45,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         updateStatus()
         if !state.preferences.onboardingComplete || demo || CommandLine.arguments.contains("--show") { showPanel() }
+        if CommandLine.arguments.contains("--smoke-test") {
+            showPanel()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                print("Holdlet normal startup OK")
+                NSApp.terminate(nil)
+            }
+        }
     }
     @objc private func togglePanel() {
         if NSApp.currentEvent?.type == .rightMouseUp {

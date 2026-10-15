@@ -77,7 +77,7 @@ struct SettingsView: View {
             } header: { Text(model.text("Notifications", "Bildirimler")) }
             Section {
                 Button(model.text("Finish setup", "Kurulumu tamamla")) { model.completeOnboarding(); model.showPanel?() }
-                Text("Holdlet 0.1.0-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
+                Text("Holdlet 0.1.1-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
             }
         }.formStyle(.grouped)
     }
@@ -251,7 +251,7 @@ struct SettingsView: View {
     private func exportDiagnostics() {
         let panel = NSSavePanel(); panel.nameFieldStringValue = "holdlet-diagnostics.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let data: [String: Any] = ["version": "0.1.0-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
+        let data: [String: Any] = ["version": "0.1.1-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "itemCount": model.snapshot.items.count, "sources": model.enabledSources.map { source in
                 ["source": source.rawValue, "hasError": model.snapshot.health[source.rawValue]?.isError ?? false,
                  "lastSuccess": model.snapshot.health[source.rawValue]?.lastSuccess.map { ISO8601DateFormatter().string(from: $0) } ?? "never"] as [String: Any]
