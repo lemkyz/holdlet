@@ -18,6 +18,13 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if model.demoInstance {
+                HStack {
+                    Text(model.text("Isolated demo · account setup is disabled.", "Yalıtılmış demo · hesap kurulumu kapalı."))
+                    Spacer()
+                    Button(model.text("Open normal mode", "Normal modu aç")) { model.exitDemo() }
+                }.font(.system(size: 12)).padding(12)
+            }
             if let error = model.error {
                 HStack { Image(systemName: "exclamationmark.triangle"); Text(error).textSelection(.enabled); Spacer(); Button { model.error = nil } label: { Image(systemName: "xmark") } }
                     .font(.system(size: 12)).padding(12).background(.orange.opacity(0.12))
@@ -32,6 +39,10 @@ struct SettingsView: View {
                 privacy.tabItem { Label(model.text("Privacy", "Gizlilik"), systemImage: "hand.raised") }
                 diagnostics.tabItem { Label(model.text("Diagnostics", "Tanılama"), systemImage: "stethoscope") }
             }.padding(14)
+            Link(model.text("Connection setup guide", "Adım adım bağlantı kurulumu"), destination: URL(string: model.preferences.language == "tr"
+                ? "https://github.com/lemkyz/holdlet/blob/main/docs/KURULUM.tr.md"
+                : "https://github.com/lemkyz/holdlet/blob/main/docs/SETUP.md")!)
+                .font(.system(size: 12)).padding(.bottom, 12)
         }.frame(minWidth: 620, idealWidth: 660, minHeight: 570, idealHeight: 650)
         .onAppear {
             googleClientID = model.preferences.googleClientID
@@ -48,7 +59,7 @@ struct SettingsView: View {
                     Text("English").tag("en"); Text("Türkçe").tag("tr")
                 }
                 Toggle(model.text("Launch at login", "Girişte başlat"), isOn: Binding(
-                    get: { SMAppService.mainApp.status == .enabled }, set: { model.setLaunchAtLogin($0) }))
+                    get: { SMAppService.mainApp.status == .enabled }, set: { model.setLaunchAtLogin($0) })).disabled(model.demoInstance)
                 if SMAppService.mainApp.status == .requiresApproval {
                     Text(model.text("Approve Holdlet in System Settings → General → Login Items.", "Sistem Ayarları → Genel → Giriş Öğeleri'nde Holdlet'e izin ver.")).font(.caption)
                 }

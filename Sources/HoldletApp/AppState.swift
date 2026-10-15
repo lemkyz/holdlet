@@ -131,6 +131,18 @@ final class AppState: ObservableObject {
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
     func completeOnboarding() { updatePreferences { $0.onboardingComplete = true } }
+    func exitDemo() {
+        guard demoInstance else { updatePreferences { $0.demoMode = false }; return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.arguments = ["--show"]
+        configuration.createsNewApplicationInstance = true
+        Task {
+            do {
+                _ = try await NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration)
+                NSApplication.shared.terminate(nil)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
 
     func enableNotifications() async {
         do {

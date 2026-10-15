@@ -80,7 +80,7 @@ struct PanelView: View {
             Image(systemName: "play.rectangle")
             Text(model.text("Sample data · No real alerts", "Örnek veriler · Gerçek uyarı yok")).font(.system(size: 11))
             Spacer()
-            Button(model.text("Exit", "Çık")) { model.updatePreferences { $0.demoMode = false } }.buttonStyle(.plain)
+            Button(model.text("Exit", "Çık")) { model.exitDemo() }.buttonStyle(.plain)
         }.padding(12).glassSurface(radius: 18)
     }
 

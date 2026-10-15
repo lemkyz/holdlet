@@ -24,4 +24,4 @@ macOS 14+ ve Swift 6+ gerekir. Yerel paket ad-hoc imzalıdır; Apple Developer I
 - Slack yanıt durumu elle takip edilir.
 - Tokenlar Keychain'de, iş başlıkları ve ayarlar yerel dosyada tutulur. Dosya uygulama tarafından şifrelenmez.
 
-[Ayrıntılı kurulum](SETUP.md) · [Doğrulama](VALIDATION.md) · [Yol haritası](ROADMAP.md)
+[Türkçe adım adım kurulum](KURULUM.tr.md) · [İngilizce kurulum](SETUP.md) · [Doğrulama](VALIDATION.md) · [Yol haritası](ROADMAP.md)
