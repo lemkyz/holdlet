@@ -2,6 +2,7 @@ import AppKit
 import HoldletCore
 import ServiceManagement
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var model: AppState
@@ -15,6 +16,7 @@ struct SettingsView: View {
     @State private var gmailQuery = ""
     @State private var connecting = false
     @State private var confirmReset = false
+    @State private var importedGoogleClient = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,6 +48,9 @@ struct SettingsView: View {
         }.frame(minWidth: 620, idealWidth: 660, minHeight: 570, idealHeight: 650)
         .onAppear {
             googleClientID = model.preferences.googleClientID
+            if googleClientID.isEmpty, let bundled = model.bundledGoogleConfiguration {
+                googleClientID = bundled.clientID; googleSecret = bundled.clientSecret
+            }
             jiraSite = model.preferences.jiraSite; jiraEmail = model.preferences.jiraEmail
             gmailQuery = model.preferences.gmailQuery; slackQuery = model.preferences.slackQuery
             Task { await model.refreshPermissionStatus() }
@@ -77,7 +82,7 @@ struct SettingsView: View {
             } header: { Text(model.text("Notifications", "Bildirimler")) }
             Section {
                 Button(model.text("Finish setup", "Kurulumu tamamla")) { model.completeOnboarding(); model.showPanel?() }
-                Text("Holdlet 0.1.1-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
+                Text("Holdlet 0.1.2-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
             }
         }.formStyle(.grouped)
     }
@@ -87,6 +92,12 @@ struct SettingsView: View {
             Section {
                 connectionStatus(.calendar)
                 if model.preferences.calendarEnabled {
+                    if !model.calendar.authorized {
+                        Button(model.text("Review Calendar permission", "Takvim iznini yenile")) { Task { await model.enableCalendar() } }
+                        Button(model.text("Open Calendar privacy settings", "Takvim gizlilik ayarlarını aç")) {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
+                        }
+                    }
                     Text(model.text("Timed events from the next 7 days. All-day and declined events are excluded.", "Önümüzdeki 7 günün saatli etkinlikleri. Tüm gün ve reddedilen etkinlikler gösterilmez.")).font(.caption)
                     ForEach(model.calendar.availableCalendars, id: \.calendarIdentifier) { calendar in
                         Toggle(calendar.title, isOn: Binding(get: {
@@ -107,22 +118,43 @@ struct SettingsView: View {
                     Button(model.text("Allow Mac Calendar access", "Mac Takvim erişimine izin ver")) { Task { await model.enableCalendar() } }
                 }
             } header: { Text("Mac Calendar") } footer: {
-                Text(model.text("Uses calendars already synced with Calendar.app. Choose this OR direct Google Calendar to avoid duplicates.",
-                    "Takvim uygulamasına eşitlenen takvimleri kullanır. Yinelenmeyi önlemek için Mac Takvim veya doğrudan Google bağlantısını seç."))
+                Text(model.text("Uses calendars already synced with Calendar.app. Gmail can stay connected alongside Mac Calendar.",
+                    "Takvim uygulamasına eşitlenen takvimleri kullanır. Gmail, Mac Takvim ile birlikte bağlı kalabilir."))
             }
             Section {
-                connectionStatus(.google); connectionStatus(.gmail)
+                if model.preferences.usesGoogleCalendar { connectionStatus(.google) }
+                connectionStatus(.gmail)
                 if model.preferences.googleEnabled {
+                    Toggle(model.text("Use direct Google Calendar", "Doğrudan Google Takvim kullan"), isOn: Binding(
+                        get: { model.preferences.usesGoogleCalendar }, set: { model.useGoogleCalendar($0) }))
+                    Text(model.text("Keep this off to use Mac Calendar while Gmail remains connected.", "Mac Takvim'i kullanırken Gmail bağlı kalsın istiyorsan bunu kapalı tut.")).font(.caption)
+                    Button(model.text("Sign in again", "Yeniden giriş yap")) { Task { await model.reconnectGoogle() } }
+                        .disabled(model.googleSigningIn)
                     Button(model.text("Disconnect Google", "Google bağlantısını kaldır")) { model.disconnect(.google) }
                 } else {
-                    TextField(model.text("Desktop OAuth client ID", "Masaüstü OAuth istemci kimliği"), text: $googleClientID)
-                    SecureField(model.text("Desktop client secret (if required)", "Masaüstü istemci sırrı (gerekiyorsa)"), text: $googleSecret)
+                    if googleClientID.isEmpty {
+                        Label(model.text("Google application setup required", "Google uygulama kurulumu gerekiyor"), systemImage: "wrench.and.screwdriver")
+                        Text(model.text("This build does not include a configured Google OAuth application. Import a Desktop client JSON to test your account. A shared Google sign-in needs the publisher's registered OAuth app.",
+                            "Bu pakette Google OAuth uygulaması tanımlı değil. Kendi hesabını denemek için Desktop istemci JSON dosyasını içe aktar. Ortak Google girişi için yayıncıya ait kayıtlı OAuth uygulaması gerekir.")).font(.caption)
+                    }
+                    Button(model.text(googleClientID.isEmpty ? "Set up Google connection…" : "Import another Desktop client…",
+                        googleClientID.isEmpty ? "Google bağlantısını kur…" : "Başka masaüstü istemcisi seç…")) { importGoogleClient() }
+                    if importedGoogleClient { Label(model.text("Desktop client loaded", "Masaüstü istemcisi yüklendi"), systemImage: "checkmark.circle").font(.caption) }
+                    DisclosureGroup(model.text("Manual developer configuration", "Elle geliştirici kurulumu")) {
+                        TextField(model.text("Desktop OAuth client ID", "Masaüstü OAuth istemci kimliği"), text: $googleClientID)
+                        SecureField(model.text("Desktop client secret (if required)", "Masaüstü istemci sırrı (gerekiyorsa)"), text: $googleSecret)
+                    }
+                    if !googleClientID.isEmpty {
                     Button(model.text("Sign in with Google", "Google ile giriş yap")) {
-                        Task { await model.connectGoogle(clientID: googleClientID, clientSecret: googleSecret); googleSecret = "" }
-                    }.disabled(model.googleSigningIn || googleClientID.isEmpty)
+                        Task {
+                            await model.connectGoogle(clientID: googleClientID, clientSecret: googleSecret)
+                            if model.preferences.googleEnabled { googleSecret = "" }
+                        }
+                    }.disabled(model.googleSigningIn)
+                    }
                 }
-                Text(model.text("Primary calendar + Gmail metadata. Read-only scopes. Bring your own Desktop OAuth client for this alpha; see the setup guide.",
-                    "Birincil takvim + Gmail üst bilgileri. Salt okunur erişim. Bu alfa için kendi masaüstü OAuth istemcini kullan; kurulum rehberine bak.")).font(.caption)
+                Text(model.text("Read-only Google access. Primary calendar is optional; Gmail is independent of your calendar source. No connection is claimed until the service sync succeeds.",
+                    "Google erişimi salt okunur. Birincil takvim isteğe bağlıdır; Gmail takvim kaynağından bağımsızdır. Servis eşitlemesi başarılı olmadan bağlı sayılmaz.")).font(.caption)
             } header: { Text("Google Workspace") }
             Section {
                 connectionStatus(.slack)
@@ -248,10 +280,21 @@ struct SettingsView: View {
     private func preference<T>(_ keyPath: WritableKeyPath<Preferences, T>) -> Binding<T> {
         Binding(get: { model.preferences[keyPath: keyPath] }, set: { value in model.updatePreferences { $0[keyPath: keyPath] = value } })
     }
+    private func importGoogleClient() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false; panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            guard ((attributes[.size] as? NSNumber)?.intValue ?? 0) <= 65_536 else { throw GoogleOAuthConfiguration.SetupError.invalidFile }
+            let config = try GoogleOAuthConfiguration(desktopJSON: Data(contentsOf: url))
+            googleClientID = config.clientID; googleSecret = config.clientSecret; importedGoogleClient = true
+        } catch { model.error = error.localizedDescription }
+    }
     private func exportDiagnostics() {
         let panel = NSSavePanel(); panel.nameFieldStringValue = "holdlet-diagnostics.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let data: [String: Any] = ["version": "0.1.1-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
+        let data: [String: Any] = ["version": "0.1.2-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "itemCount": model.snapshot.items.count, "sources": model.enabledSources.map { source in
                 ["source": source.rawValue, "hasError": model.snapshot.health[source.rawValue]?.isError ?? false,
                  "lastSuccess": model.snapshot.health[source.rawValue]?.lastSuccess.map { ISO8601DateFormatter().string(from: $0) } ?? "never"] as [String: Any]

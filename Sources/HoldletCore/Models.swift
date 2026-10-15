@@ -77,6 +77,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var language = "en"
     public var calendarEnabled = false
     public var googleEnabled = false
+    public var googleCalendarEnabled: Bool?
     public var slackEnabled = false
     public var jiraEnabled = false
     public var selectedCalendarIDs: [String] = []
@@ -93,6 +94,15 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var meetingLeadMinutes = 5
     public var onboardingComplete = false
     public var panelPinned = false
+    public var usesGoogleCalendar: Bool { googleEnabled && (googleCalendarEnabled ?? !calendarEnabled) }
+    public mutating func selectMacCalendar() { calendarEnabled = true; googleCalendarEnabled = false }
+    public mutating func selectGoogleCalendar(_ enabled: Bool) {
+        googleCalendarEnabled = enabled
+        if enabled { calendarEnabled = false }
+    }
+    public mutating func connectGoogle(clientID: String) {
+        googleClientID = clientID; googleEnabled = true; googleCalendarEnabled = !calendarEnabled
+    }
     public init() {}
 }
 

@@ -8,7 +8,8 @@ let package = Package(
     targets: [
         .target(name: "HoldletCore"),
         .executableTarget(name: "HoldletApp", dependencies: ["HoldletCore"]),
-        .testTarget(name: "HoldletCoreTests", dependencies: ["HoldletCore"])
+        .testTarget(name: "HoldletCoreTests", dependencies: ["HoldletCore"]),
+        .testTarget(name: "HoldletAppTests", dependencies: ["HoldletApp", "HoldletCore"])
     ],
     swiftLanguageModes: [.v5]
 )

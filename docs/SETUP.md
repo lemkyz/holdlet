@@ -1,15 +1,15 @@
 # Connect your tools
 
-This alpha uses your own credentials. Never paste tokens into GitHub issues or chat. Add them inside the app's SecureFields. Credentials are saved to Keychain only after a successful connection test (Google saves the optional desktop client secret before opening the OAuth flow).
+This alpha uses your own credentials unless the publisher configured the Google OAuth client in the build. Never paste tokens into GitHub issues or chat. Add them inside the app. Google credentials are saved to Keychain after the authorization exchange succeeds. Importing the client file only fills the in-memory form.
 
-## Mac Calendar — quickest path
+## Mac Calendar - quickest path
 
 1. Add your Google, Exchange or iCloud account to Apple's Calendar app if needed.
 2. Holdlet → Settings → Connections → Mac Calendar → Allow access.
 3. Select the calendars to watch. With no explicit selection, all available calendars are used.
 4. Events already synced with Calendar.app appear after refresh. Holdlet does not write events.
 
-Direct Google and Mac Calendar are mutually exclusive in this alpha to avoid duplicate events. Switching to Mac Calendar disables the combined direct Google connection, including Gmail; its saved OAuth credentials remain in Keychain until you disconnect Google explicitly. Reconnect Google to use Gmail again. Separating mail and calendar provider switches is on the roadmap.
+Mac Calendar and direct Google Calendar are alternative event sources, but Gmail is independent. Connecting Google while Mac Calendar is active preserves it and connects Gmail. Turn on **Use direct Google Calendar** to switch event sources. Switching back to Mac Calendar does not disconnect Gmail.
 
 ## Google Calendar and Gmail
 
@@ -17,7 +17,7 @@ Direct Google and Mac Calendar are mutually exclusive in this alpha to avoid dup
 2. Enable the **Google Calendar API** and **Gmail API**.
 3. Configure the OAuth consent screen. For a personal test project in Testing mode, add your own Google account as a test user.
 4. Create an OAuth client of type **Desktop app**. A Web client is not interchangeable.
-5. Enter the client ID in Holdlet. If your Google client requires a desktop client secret, enter it in the optional secret field. Do not commit the downloaded client JSON.
+5. Download that client's JSON file. In Holdlet choose **Set up Google connection** and select the file. The app fills the matching ID and secret together and rejects Web client files. Manual fields remain under developer configuration. Do not commit the downloaded client JSON.
 6. Select **Sign in with Google**, complete the external browser flow, and return to Holdlet. Holdlet binds a temporary `127.0.0.1` port, verifies `state`, and exchanges the code with a PKCE verifier.
 
 Scopes:
@@ -37,7 +37,7 @@ Gmail web links use account slot `/u/0/`; if multiple Google browser accounts ar
 
 References: [native OAuth](https://developers.google.com/identity/protocols/oauth2/native-app), [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), [Gmail thread metadata](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/get).
 
-## Slack — internal personal setup
+## Slack - internal personal setup
 
 1. Create/install an internal Slack app in a workspace where your administrator allows it.
 2. Add the **user token scope** `search:read`. A bot token is insufficient for this adapter.
@@ -50,7 +50,7 @@ This reads matching messages visible to your user; it does not read everything, 
 
 References: [search.messages](https://docs.slack.dev/reference/methods/search.messages/), [search:read](https://docs.slack.dev/reference/scopes/search.read/), [rate limits](https://docs.slack.dev/apis/web-api/rate-limits/).
 
-## Jira Cloud — personal token setup
+## Jira Cloud - personal token setup
 
 1. Use an **unscoped personal API token** from your Atlassian account. This alpha uses site-based Basic authentication; scoped API gateway tokens need a different adapter and are not supported.
 2. Enter an HTTPS site such as `https://your-company.atlassian.net`, your Atlassian account email and the token.

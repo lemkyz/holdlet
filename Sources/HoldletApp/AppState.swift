@@ -79,7 +79,8 @@ final class AppState: ObservableObject {
     var enabledSources: [Source] {
         var sources: [Source] = []
         if preferences.calendarEnabled { sources.append(.calendar) }
-        if preferences.googleEnabled { sources += [.google, .gmail] }
+        if preferences.usesGoogleCalendar { sources.append(.google) }
+        if preferences.googleEnabled { sources.append(.gmail) }
         if preferences.slackEnabled { sources.append(.slack) }
         if preferences.jiraEnabled { sources.append(.jira) }
         return sources
@@ -166,25 +167,40 @@ final class AppState: ObservableObject {
     func enableCalendar() async {
         do {
             guard try await calendar.authorize() else { throw APIError.provider("calendar_permission_denied") }
-            updatePreferences { $0.calendarEnabled = true; $0.googleEnabled = false }
-            snapshot.items.removeAll { $0.source == .google || $0.source == .gmail }
+            updatePreferences { $0.selectMacCalendar() }
+            snapshot.items.removeAll { $0.source == .google }
             save(); reconcile()
             await sync()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = connectionMessage(error) }
     }
     func connectGoogle(clientID: String, clientSecret: String) async {
+        guard !googleSigningIn else { return }
         googleSigningIn = true; defer { googleSigningIn = false }
         do {
-            if !clientSecret.isEmpty { try SecretStore.set(clientSecret, for: "google.clientSecret") }
-            try await googleAuth.authorize(clientID: clientID.trimmingCharacters(in: .whitespacesAndNewlines))
-            updatePreferences {
-                $0.googleClientID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
-                $0.googleEnabled = true; $0.calendarEnabled = false
-            }
-            // Switching calendar providers removes duplicate events and their pending alerts.
-            snapshot.items.removeAll { $0.source == .calendar }; save(); reconcile()
+            let configuration = try GoogleOAuthConfiguration(clientID: clientID, clientSecret: clientSecret)
+            try await googleAuth.authorize(configuration: configuration)
+            updatePreferences { $0.connectGoogle(clientID: configuration.clientID) }
+            save(); reconcile()
             await sync()
-        } catch { self.error = error.localizedDescription }
+        } catch is CancellationError {
+            notice = text("Google sign-in canceled. Your existing connections are unchanged.", "Google girişi iptal edildi. Mevcut bağlantıların korunuyor.")
+        } catch { self.error = connectionMessage(error) }
+    }
+    func useGoogleCalendar(_ enabled: Bool) {
+        updatePreferences { $0.selectGoogleCalendar(enabled) }
+        snapshot.items.removeAll { enabled ? $0.source == .calendar : $0.source == .google }
+        save(); reconcile(); Task { await sync() }
+    }
+    func reconnectGoogle() async {
+        do {
+            let secret = try SecretStore.get("google.clientSecret") ?? ""
+            await connectGoogle(clientID: preferences.googleClientID, clientSecret: secret)
+        } catch { self.error = connectionMessage(error) }
+    }
+    var bundledGoogleConfiguration: GoogleOAuthConfiguration? {
+        guard let id = Bundle.main.object(forInfoDictionaryKey: "HoldletGoogleClientID") as? String else { return nil }
+        return try? GoogleOAuthConfiguration(clientID: id,
+            clientSecret: Bundle.main.object(forInfoDictionaryKey: "HoldletGoogleClientSecret") as? String ?? "")
     }
     func connectSlack(token: String, query: String) async {
         do {
@@ -209,7 +225,8 @@ final class AppState: ObservableObject {
             switch source {
             case .google, .gmail:
                 googleAuth.cancel(); try SecretStore.delete("google.tokens"); try SecretStore.delete("google.clientSecret")
-                snapshot.preferences.googleEnabled = false; snapshot.preferences.googleClientID = ""; sources = [.google, .gmail]
+                snapshot.preferences.googleEnabled = false; snapshot.preferences.googleCalendarEnabled = false
+                snapshot.preferences.googleClientID = ""; sources = [.google, .gmail]
             case .slack: try SecretStore.delete("slack.token"); snapshot.preferences.slackEnabled = false; sources = [.slack]
             case .jira:
                 try SecretStore.delete("jira.token"); snapshot.preferences.jiraEnabled = false
@@ -241,7 +258,7 @@ final class AppState: ObservableObject {
         if prefs.googleEnabled, canRetry(.google) || canRetry(.gmail) {
             do {
                 let token = try await googleAuth.accessToken(clientID: prefs.googleClientID)
-                if canRetry(.google) {
+                if prefs.usesGoogleCalendar, canRetry(.google) {
                     do { let items = try await GoogleConnector.events(token: token, now: Date()); if epoch == generation { merge(items, source: .google); markSuccess(.google) } }
                     catch { if epoch == generation { markFailure(.google, error) } }
                 }
@@ -254,7 +271,12 @@ final class AppState: ObservableObject {
                     }
                     catch { if epoch == generation { markFailure(.gmail, error) } }
                 }
-            } catch { if epoch == generation { markFailure(.google, error); markFailure(.gmail, error) } }
+            } catch {
+                if epoch == generation {
+                    if prefs.usesGoogleCalendar { markFailure(.google, error) }
+                    markFailure(.gmail, error)
+                }
+            }
         }
         if prefs.slackEnabled, canRetry(.slack) {
             do {
@@ -303,8 +325,16 @@ final class AppState: ObservableObject {
     }
     private func markFailure(_ source: Source, _ error: Error) {
         snapshot.health[source.rawValue] = ConnectionHealth(lastSuccess: snapshot.health[source.rawValue]?.lastSuccess,
-            message: error.localizedDescription, isError: true)
+            message: connectionMessage(error), isError: true)
         if case APIError.rateLimited(let seconds) = error { retryAfter[source] = Date().addingTimeInterval(Double(seconds)) }
+    }
+    private func connectionMessage(_ error: Error) -> String {
+        if let error = error as? ProviderFailure { return error.message(language: preferences.language) }
+        if case APIError.provider(let code) = error, code == "calendar_permission_required" || code == "calendar_permission_denied" {
+            return text("Calendar access needs approval. Review Calendar permission in Connections, or open macOS Calendar privacy settings.",
+                "Takvim erişim izni gerekiyor. Bağlantılar'da Takvim iznini yenile düğmesini veya macOS Takvim gizlilik ayarlarını kullan.")
+        }
+        return error.localizedDescription
     }
     private func canRetry(_ source: Source) -> Bool { (retryAfter[source] ?? .distantPast) <= Date() }
     private func save() {

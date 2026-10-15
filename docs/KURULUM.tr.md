@@ -1,4 +1,4 @@
-# Holdlet — adım adım bağlantı kurulumu
+# Holdlet - adım adım bağlantı kurulumu
 
 Bu geliştirici alfasında hazır bir ortak OAuth uygulaması yok. Kendi hesaplarınla deneme yapmak için aşağıdaki bilgileri bir kez hazırlıyorsun. İleride genel kullanıma yönelik doğrulanmış giriş akışı bu adımların yerini alacak.
 
@@ -18,7 +18,7 @@ Uygulamayı sürekli tutacağın bir yere taşıdıktan sonra aç. Menü çubuğ
 4. İzlemek istediğin takvimleri seç.
 5. Gelecekteki saatli bir toplantıyı ekle/değiştir; Holdlet'te Yenile'ye bas. Son başarılı eşitleme zamanını kontrol et.
 
-Bu yol yalnızca takvim içindir; Gmail kutusunu bağlamaz. Holdlet takvimine yazmaz. İlk sürüm yinelenmeyi önlemek için Mac Takvim ile doğrudan Google bağlantısını birlikte kullanmaz; Mac Takvim'e geçmek doğrudan Google/Gmail bağlantısını devre dışı bırakır.
+Bu yol yalnızca takvim içindir; Gmail kutusunu bağlamaz. Holdlet takvimine yazmaz. Gmail'i ayrıca bağlayıp Mac Takvim'i kullanmaya devam edebilirsin. Yalnızca doğrudan Google Takvim kaynağını seçersen yinelenmeyi önlemek için Mac Takvim kaynağı kapatılır.
 
 ## 2. Gmail + doğrudan Google Calendar
 
@@ -29,9 +29,9 @@ Hazırlayacağın bilgiler: **Desktop OAuth client ID** ve gerekiyorsa aynı ist
 3. **Google Auth Platform / OAuth consent screen** bölümünde uygulama adı ve destek e-postanı ayarla.
 4. Kişisel test için hedef kitleyi hesabına uygun seç; harici test uygulamasında **Audience → Test users** alanına giriş yapacağın Google hesabını ekle. Şirket hesabındaki yönetici kuralları ayrıca geçerlidir.
 5. **Clients → Create client** içinde türü **Desktop app** seç. Web application seçme.
-6. Oluşan Client ID'yi Holdlet → Bağlantılar → Google Workspace alanına gir. İstemci sırrı gerekiyorsa aynı ekrandaki güvenli alana ekle.
+6. Oluşan Desktop istemcisinin JSON dosyasını indir. Holdlet → Bağlantılar → Google Workspace → **Google bağlantısını kur** düğmesiyle bu dosyayı seç. Kimlik ve varsa istemci sırrı aynı dosyadan doldurulur. Web istemcisi dosyası kabul edilmez.
 7. **Google ile giriş yap** düğmesine bas. Varsayılan tarayıcıda doğru hesabı seç; istenen salt okunur takvim ve Gmail erişimini inceleyip izin ver.
-8. Holdlet'e dön; Calendar ve Gmail için ayrı ayrı son başarılı eşitlemeyi kontrol et.
+8. Holdlet'e dön; Gmail için son başarılı eşitlemeyi kontrol et. Doğrudan Google Takvim'i kullanacaksan ilgili seçeneği aç ve onun eşitlemesini de kontrol et. Apple Takvim zaten bağlıysa başlangıçta korunur.
 
 Uygulama birincil Google takvimini okur. Gmail'de varsayılan sorgu `is:unread is:important newer_than:7d`; Kurallar ekranından değiştirebilirsin. Gmail kapsamı `gmail.readonly` düzeyindedir; uygulama şu an yalnızca konuşma üst bilgilerini getirir, fakat verdiğin yetki bununla sınırlı değildir. Takvim kapsamı `calendar.events.readonly`.
 

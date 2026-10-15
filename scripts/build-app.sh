@@ -8,6 +8,12 @@ app_dir="$PWD/dist/Holdlet.app"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$bin_dir/Holdlet" "$app_dir/Contents/MacOS/Holdlet"
 cp scripts/Info.plist "$app_dir/Contents/Info.plist"
+if [[ -n "${HOLDLET_GOOGLE_CLIENT_ID:-}" ]]; then
+    plutil -insert HoldletGoogleClientID -string "$HOLDLET_GOOGLE_CLIENT_ID" "$app_dir/Contents/Info.plist"
+    if [[ -n "${HOLDLET_GOOGLE_CLIENT_SECRET:-}" ]]; then
+        plutil -insert HoldletGoogleClientSecret -string "$HOLDLET_GOOGLE_CLIENT_SECRET" "$app_dir/Contents/Info.plist"
+    fi
+fi
 mkdir -p build
 if [[ ! -f build/AppIcon.icns || scripts/make-icon.swift -nt build/AppIcon.icns ]]; then
     swift scripts/make-icon.swift "$PWD/build/AppIcon.iconset"

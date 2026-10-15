@@ -23,7 +23,7 @@ The priority is dependable daily use, with explicit provider limitations. An ada
 - Real-world acceptance across Focus, full-screen apps, Spaces, external displays, sleep/wake and offline recovery
 - Notification grouping, clear overdue recovery and optional configurable escalation
 - Weekday/overnight work schedules; timezone changes while running
-- Google pagination/multi-calendar support, browser account routing and independent Gmail/calendar toggles
+- Google pagination/multi-calendar support and browser account routing
 - Slack OAuth distribution/approval strategy and event-based updates where allowed
 - Jira OAuth 3LO; pagination and explicit due-date time policy
 - Multi-account identity, bounded retention and a storage migration strategy

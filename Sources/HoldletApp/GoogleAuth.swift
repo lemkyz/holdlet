@@ -3,11 +3,13 @@ import CryptoKit
 import Foundation
 import Network
 import Security
+import HoldletCore
 
 struct GoogleTokens: Codable {
     var accessToken: String
     var refreshToken: String
     var expiresAt: Date
+    var clientID: String?
 }
 
 @MainActor
@@ -18,12 +20,22 @@ final class GoogleAuth {
     private var timeout: Task<Void, Never>?
     private var state = ""
     private var receivedCallback = false
+    private var flowID = UUID()
+    private var connections: [NWConnection] = []
     private(set) var busy = false
 
-    func authorize(clientID: String) async throws {
+    func authorize(configuration: GoogleOAuthConfiguration) async throws {
         guard !busy else { throw APIError.provider("authorization_in_progress") }
-        guard clientID.hasSuffix(".apps.googleusercontent.com"), !clientID.contains(" ") else { throw APIError.provider("invalid_desktop_client_id") }
+        let clientID = configuration.clientID
+        let attempt = UUID(); flowID = attempt
         busy = true; defer { busy = false; stop() }
+        timeout = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 180_000_000_000)
+            guard !Task.isCancelled, let self, self.flowID == attempt else { return }
+            self.flowID = UUID()
+            self.finish(.failure(APIError.provider("authorization_timed_out")))
+            self.stop()
+        }
         state = try randomURLSafe(); let verifier = try randomURLSafe()
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
         let parameters = NWParameters.tcp
@@ -53,8 +65,9 @@ final class GoogleAuth {
             continuation = result
             server.newConnectionHandler = { [weak self] connection in
                 connection.start(queue: .main)
-                connection.receive(minimumIncompleteLength: 1, maximumLength: 16384) { data, _, _, _ in
-                    Task { @MainActor [weak self] in self?.receive(data: data, connection: connection) }
+                Task { @MainActor [weak self] in
+                    self?.connections.append(connection)
+                    self?.receiveHeader(connection, buffered: Data())
                 }
             }
             var parts = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
@@ -66,35 +79,36 @@ final class GoogleAuth {
             guard let url = parts.url, NSWorkspace.shared.open(url) else {
                 finish(.failure(APIError.provider("browser_could_not_open"))); return
             }
-            timeout = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 180_000_000_000)
-                guard !Task.isCancelled else { return }
-                self?.finish(.failure(APIError.provider("authorization_timed_out")))
-            }
         }
+        guard flowID == attempt else { throw CancellationError() }
         var fields = ["client_id": clientID, "code": code, "code_verifier": verifier,
                       "redirect_uri": redirect, "grant_type": "authorization_code"]
-        if let secret = try SecretStore.get("google.clientSecret"), !secret.isEmpty { fields["client_secret"] = secret }
+        if !configuration.clientSecret.isEmpty { fields["client_secret"] = configuration.clientSecret }
         let json = try await tokenRequest(fields)
+        guard flowID == attempt else { throw CancellationError() }
         guard let access = json["access_token"] as? String, let refresh = json["refresh_token"] as? String else { throw APIError.invalidResponse }
+        if configuration.clientSecret.isEmpty { try SecretStore.delete("google.clientSecret") }
+        else { try SecretStore.set(configuration.clientSecret, for: "google.clientSecret") }
         try save(GoogleTokens(accessToken: access, refreshToken: refresh,
-                              expiresAt: Date().addingTimeInterval(json["expires_in"] as? Double ?? 3600)))
+                              expiresAt: Date().addingTimeInterval(json["expires_in"] as? Double ?? 3600), clientID: clientID))
     }
 
     func accessToken(clientID: String) async throws -> String {
         guard let raw = try SecretStore.get("google.tokens"), let data = raw.data(using: .utf8),
               var tokens = try? JSONDecoder().decode(GoogleTokens.self, from: data) else { throw APIError.missingCredentials }
+        guard tokens.clientID == nil || tokens.clientID == clientID else { throw APIError.provider("google_client_changed") }
         if tokens.expiresAt > Date().addingTimeInterval(60) { return tokens.accessToken }
         var fields = ["client_id": clientID, "refresh_token": tokens.refreshToken, "grant_type": "refresh_token"]
         if let secret = try SecretStore.get("google.clientSecret"), !secret.isEmpty { fields["client_secret"] = secret }
         let json = try await tokenRequest(fields)
         guard let access = json["access_token"] as? String else { throw APIError.invalidResponse }
+        guard try SecretStore.get("google.tokens") == raw else { throw CancellationError() }
         tokens.accessToken = access
         tokens.expiresAt = Date().addingTimeInterval(json["expires_in"] as? Double ?? 3600)
         try save(tokens); return access
     }
 
-    func cancel() { finish(.failure(CancellationError())); stop() }
+    func cancel() { flowID = UUID(); finish(.failure(CancellationError())); stop() }
     private func tokenRequest(_ fields: [String: String]) async throws -> [String: Any] {
         var request = HTTP.request(URL(string: "https://oauth2.googleapis.com/token")!)
         request.httpMethod = "POST"; request.httpBody = HTTP.form(fields)
@@ -103,6 +117,19 @@ final class GoogleAuth {
     }
     private func save(_ value: GoogleTokens) throws {
         try SecretStore.set(String(decoding: JSONEncoder().encode(value), as: UTF8.self), for: "google.tokens")
+    }
+    private func receiveHeader(_ connection: NWConnection, buffered: Data) {
+        guard buffered.count < 16384 else { connection.cancel(); return }
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 16384 - buffered.count) { [weak self] data, _, ended, error in
+            Task { @MainActor [weak self] in
+                guard let self else { connection.cancel(); return }
+                var all = buffered
+                if let data { all.append(data) }
+                if all.range(of: Data("\r\n\r\n".utf8)) != nil { self.receive(data: all, connection: connection) }
+                else if error != nil || ended { connection.cancel() }
+                else { self.receiveHeader(connection, buffered: all) }
+            }
+        }
     }
     private func receive(data: Data?, connection: NWConnection) {
         guard let data, let text = String(data: data, encoding: .utf8),
@@ -114,19 +141,21 @@ final class GoogleAuth {
         let query = url.queryItems ?? []
         let valid = url.path == "/oauth/callback" && query.first(where: { $0.name == "state" })?.value == state
         let code = query.first(where: { $0.name == "code" })?.value
-        let accepted = valid && !receivedCallback && code != nil
-        let body = accepted ? "Holdlet sign-in received. You can close this tab." : "Invalid or declined sign-in. Return to Holdlet."
+        let accepted = valid && !receivedCallback && code?.isEmpty == false
+        let body = accepted ? "Authorization response received. Return to Holdlet to check the connection status." : "Invalid or declined sign-in. Return to Holdlet."
         let response = "HTTP/1.1 \(accepted ? "200 OK" : "400 Bad Request")\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
         connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
         guard valid, !receivedCallback else { return }
         receivedCallback = true
-        if let code { finish(.success(code)) } else { finish(.failure(APIError.provider("authorization_declined"))) }
+        if let code, !code.isEmpty { finish(.success(code)) }
+        else { finish(.failure(ProviderFailure(status: 403, code: "access_denied"))) }
     }
     private func finish(_ result: Result<String, Error>) {
         let pending = continuation; continuation = nil; pending?.resume(with: result)
     }
     private func stop() {
         timeout?.cancel(); timeout = nil; listener?.cancel(); listener = nil
+        connections.forEach { $0.cancel() }; connections.removeAll()
         let pending = readyContinuation; readyContinuation = nil; pending?.resume(throwing: CancellationError())
     }
     private func randomURLSafe() throws -> String {

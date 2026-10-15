@@ -1,4 +1,5 @@
 import Foundation
+import HoldletCore
 
 enum APIError: LocalizedError {
     case invalidURL, rejected(Int), rateLimited(Int), invalidResponse, provider(String), missingCredentials
@@ -28,13 +29,13 @@ enum HTTP {
         if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         return request
     }
-    static func json(_ request: URLRequest) async throws -> [String: Any] {
+    static func json(_ request: URLRequest, session: URLSession = HTTP.session) async throws -> [String: Any] {
         let (data, response) = try await session.data(for: request)
         guard let response = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         if response.statusCode == 429 {
             throw APIError.rateLimited(max(1, Int(response.value(forHTTPHeaderField: "Retry-After") ?? "120") ?? 120))
         }
-        guard (200...299).contains(response.statusCode) else { throw APIError.rejected(response.statusCode) }
+        guard (200...299).contains(response.statusCode) else { throw ProviderFailure.decode(status: response.statusCode, data: data) }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw APIError.invalidResponse }
         return object
     }

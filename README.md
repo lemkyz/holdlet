@@ -4,7 +4,7 @@
 <p align="center">A native, open-source macOS menu-bar companion for meetings, follow-ups and focused work.</p>
 <p align="center"><a href="https://github.com/lemkyz/holdlet/actions/workflows/ci.yml">Build & tests</a> · <a href="docs/SETUP.md">Connect your tools</a> · <a href="docs/ROADMAP.md">Roadmap</a> · <a href="docs/README.tr.md">Türkçe</a></p>
 
-**Status: developer alpha, not a production or enterprise-certified release.** The local app builds and the core tests run on macOS. Provider adapters are implemented, but live Google/Slack/Jira account acceptance tests require your own credentials. No hosted OAuth app, backend, or subscription is included.
+**Status: developer alpha.** Mac Calendar and local workflows have been exercised in the app. Google, Slack and Jira need developer setup and have not passed live-account acceptance. A green test run does not mean those connections are ready for ordinary users. No shared Google OAuth application is configured in the default download. See [connection readiness](docs/STATUS.md).
 
 <p align="center"><img src="docs/screenshot.png" width="320" alt="Holdlet native Mac panel showing synthetic demo data"></p>
 
@@ -13,7 +13,7 @@ The screenshot is from the running native app with synthetic data. Window-only c
 ## What it does
 
 - Lives in the menu bar; can launch at login with your permission.
-- Opens a Control Center-inspired panel with native glass modules. Uses Liquid Glass on macOS 26, visual-effect materials on macOS 14–15.
+- Opens a Control Center-inspired panel with native glass modules. Uses Liquid Glass on macOS 26, visual-effect materials on macOS 14-15.
 - Shows the next meeting with a countdown and a safe HTTPS join link.
 - Keeps personal follow-up states separate from source-system task states: active, waiting, snoozed, complete.
 - Saves local reminders, snoozes and focus sessions across restarts.
@@ -26,8 +26,8 @@ The screenshot is from the running native app with synthetic data. Window-only c
 | Source | Supported scope | Setup |
 |---|---|---|
 | Mac Calendar | Selected calendars, next 7 days, timed/non-declined events | macOS Calendar permission |
-| Google Calendar | Primary calendar, next 7 days, up to 250 timed events | Your Desktop OAuth client |
-| Gmail | Up to 50 matching threads, plus up to 50 waiting threads | Same Google sign-in; read-only Gmail scope |
+| Google Calendar | Primary calendar, next 7 days, up to 250 timed events | Import Desktop OAuth JSON or use a publisher-configured build |
+| Gmail | Up to 50 matching threads, plus up to 50 waiting threads | Same Google sign-in; works alongside Mac Calendar |
 | Slack | Up to 100 matches for a user-defined search | Internal user OAuth token with `search:read` |
 | Jira Cloud | Up to 100 unfinished issues assigned to you | Site, account email, unscoped personal API token |
 
