@@ -1,0 +1,7 @@
+# Changelog
+
+## 0.1.0-alpha — 2026-10-15
+
+Initial native macOS developer alpha: Control Center-inspired glass panel; menu-bar countdown; local reminders and personal follow-up states; focus timer; notifications; launch-at-login; Mac Calendar; bring-your-own-client Google OAuth/Calendar/Gmail; internal Slack search; personal-token Jira Cloud; connection health; privacy mode; English/Turkish UI; synthetic demo; tests and build workflow.
+
+Real external accounts, enterprise deployment and Developer ID/notarized distribution require further acceptance/setup. See the README and roadmap for explicit limits.

@@ -1,0 +1,32 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  macos:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version
+      - name: Test
+        run: ./scripts/test.sh
+      - name: Build app
+        run: ./scripts/build-app.sh
+      - name: Verify bundle
+        run: |
+          plutil -lint dist/Holdlet.app/Contents/Info.plist
+          codesign --verify --deep --strict --verbose=2 dist/Holdlet.app
+          ditto -c -k --sequesterRsrc --keepParent dist/Holdlet.app dist/Holdlet-macOS-developer.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Holdlet-macOS-developer
+          path: dist/Holdlet-macOS-developer.zip
+          retention-days: 14

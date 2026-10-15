@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible issue without private data
+body:
+  - type: markdown
+    attributes:
+      value: Do not include tokens, inbox screenshots, real customer data, or local state files.
+  - type: input
+    id: environment
+    attributes:
+      label: macOS version, architecture and Holdlet version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Redacted diagnostics or synthetic screenshots

@@ -1,0 +1,17 @@
+.build/
+.swiftpm/
+.DS_Store
+build/
+dist/
+*.xcuserstate
+xcuserdata/
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+*.key
+credentials*.json
+client_secret*.json
+*.dmg
+*.app/
