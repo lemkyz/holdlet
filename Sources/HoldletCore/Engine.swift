@@ -74,11 +74,7 @@ public enum ReminderPlanner {
                 guard item.kind == .meeting, due > now else { return nil }
                 fire = now.addingTimeInterval(2)
             }
-            if preferences.respectWorkHours {
-                guard preferences.workStart < preferences.workEnd else { return nil }
-                let hour = calendar.component(.hour, from: fire)
-                guard hour >= preferences.workStart && hour < preferences.workEnd else { return nil }
-            }
+            guard WorkSchedule.allows(fire, preferences: preferences, calendar: calendar) else { return nil }
             // Stable per deadline, even when opening/syncing repeatedly inside the lead window.
             let id = "holdlet.item.\(item.id).\(Int(due.timeIntervalSince1970))"
             return PlannedReminder(id: id, itemID: item.id, date: fire,

@@ -1,6 +1,18 @@
 # Connect your tools
 
-This alpha uses your own credentials unless the publisher configured the Google OAuth client in the build. Never paste tokens into GitHub issues or chat. Add them inside the app. Google credentials are saved to Keychain after the authorization exchange succeeds. Importing the client file only fills the in-memory form.
+## Everyday setup
+
+Open **Settings → General → Set up my Mac**. Holdlet requests Calendar/notification permission and enables launch at login. Rejected permissions lead directly to their macOS settings pages. In **Connections**, choose calendars already synced to this Mac, or open **Internet Accounts** using the add-calendar button. Google, Outlook, Exchange and iCloud calendars in Calendar.app share this path.
+
+Close Settings: the edge handle and menu icon stay available. Drag the handle to any edge/display, click or scroll inward to open, and use Escape or outward scrolling to hide. Control + Option + H is the default global shortcut. Quitting intentionally stops syncing; automatic start runs at the next login.
+
+No developer project or pasted token is required for everyday use. Public Gmail/Slack/Jira sign-in is unavailable in this preview until publisher registrations are completed. This is separate from Calendar.app support.
+
+## Internal developer connections
+
+The following instructions are only for contributors/internal testing. Open **Settings → Diagnostics → Developer connections** to reach the credential fields. They are not part of ordinary onboarding.
+
+Never paste tokens into GitHub issues or chat. Google credentials are saved to Keychain after authorization succeeds; importing a client file only fills the in-memory form.
 
 ## Mac Calendar - quickest path
 

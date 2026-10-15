@@ -13,12 +13,18 @@ final class AppState: ObservableObject {
     @Published var notice: String?
     @Published var googleSigningIn = false
     @Published var notificationStatus = ""
+    @Published var notificationsAllowed = false
+    @Published var settingsPage = "general"
+    @Published var preparing = false
+    @Published var shortcutAvailable = false
     let calendar = CalendarConnector()
     let googleAuth = GoogleAuth()
     let notifications: NotificationService
     let demoInstance: Bool
     var showPanel: (() -> Void)?
     var showSettings: (() -> Void)?
+    var hidePanel: (() -> Void)?
+    var previewEdge: (() -> Void)?
     private let disk: SnapshotStore
     private var clock: Timer?
     private var poll: Timer?
@@ -58,6 +64,9 @@ final class AppState: ObservableObject {
                 self.notice = self.text("Welcome back. Your open follow-ups are below.", "Tekrar merhaba. Açık takiplerin aşağıda.")
                 self.reconcile(); await self.sync()
             }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in await self?.refreshPermissionStatus() }
         })
         observers.append(NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in await self?.sync() }
@@ -134,6 +143,17 @@ final class AppState: ObservableObject {
         let seconds = max(0, Int((snapshot.focusEndsAt ?? now).timeIntervalSince(now)))
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
+    func openConnections() { settingsPage = "connections"; showSettings?() }
+    func prepareMac() async {
+        guard !preparing, !demoInstance else { return }
+        preparing = true; defer { preparing = false }
+        await enableNotifications()
+        await enableCalendar()
+        setLaunchAtLogin(true)
+        updatePreferences { $0.edgeDock = EdgeDockPreferences(); $0.onboardingComplete = true }
+        notice = text("Holdlet stays in the menu bar and at the screen edge. Close this window whenever you like.",
+                      "Holdlet menü çubuğunda ve ekran kenarında kalır. Bu pencereyi kapatabilirsin.")
+    }
     func completeOnboarding() { updatePreferences { $0.onboardingComplete = true } }
     func exitDemo() {
         guard demoInstance else { updatePreferences { $0.demoMode = false }; return }
@@ -150,6 +170,11 @@ final class AppState: ObservableObject {
 
     func enableNotifications() async {
         do {
+            if await notifications.permissionStatus() == .denied {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+                notice = text("Enable Holdlet in Notifications, then return here.", "Bildirimler'de Holdlet'e izin verip buraya dön.")
+                return
+            }
             let granted = try await notifications.requestAuthorization()
             updatePreferences { $0.notificationsEnabled = granted }
             await refreshPermissionStatus()
@@ -162,9 +187,15 @@ final class AppState: ObservableObject {
     }
     func refreshPermissionStatus() async {
         let status = await notifications.permissionStatus()
-        notificationStatus = status == .authorized ? text("Allowed", "İzin verildi") : text("Not allowed", "İzin yok")
+        notificationsAllowed = status == .authorized || status == .provisional
+        notificationStatus = notificationsAllowed ? text("Allowed", "İzin verildi") : text("Not allowed", "İzin yok")
     }
     func enableCalendar() async {
+        if calendar.needsSettings {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
+            notice = text("Enable Holdlet in Calendar permissions, then connect again.", "Takvim izinlerinde Holdlet'i açıp yeniden bağlan.")
+            return
+        }
         do {
             guard try await calendar.authorize() else { throw APIError.provider("calendar_permission_denied") }
             updatePreferences { $0.selectMacCalendar() }

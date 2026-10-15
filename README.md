@@ -1,10 +1,10 @@
 <p align="center"><img src="docs/brand.svg" width="80" alt="Holdlet icon"></p>
 <h1 align="center">Holdlet</h1>
 <p align="center">Keep work from slipping away.</p>
-<p align="center">A native, open-source macOS menu-bar companion for meetings, follow-ups and focused work.</p>
+<p align="center">A native, open-source Mac companion that keeps meetings and follow-ups at the screen edge.</p>
 <p align="center"><a href="https://github.com/lemkyz/holdlet/actions/workflows/ci.yml">Build & tests</a> · <a href="docs/SETUP.md">Connect your tools</a> · <a href="docs/ROADMAP.md">Roadmap</a> · <a href="docs/README.tr.md">Türkçe</a></p>
 
-**Status: developer alpha.** Mac Calendar and local workflows have been exercised in the app. Google, Slack and Jira need developer setup and have not passed live-account acceptance. A green test run does not mean those connections are ready for ordinary users. No shared Google OAuth application is configured in the default download. See [connection readiness](docs/STATUS.md).
+**Status: 0.2 developer preview.** The menu bar, screen-edge drawer, Mac Calendar and local workflows are usable now. Public Gmail, Slack and Jira sign-in still require publisher registrations and live-account acceptance. Ordinary setup no longer asks users for developer credentials. See [connection readiness](docs/STATUS.md).
 
 <p align="center"><img src="docs/screenshot.png" width="320" alt="Holdlet native Mac panel showing synthetic demo data"></p>
 
@@ -12,7 +12,12 @@ The screenshot is from the running native app with synthetic data. Window-only c
 
 ## What it does
 
-- Lives in the menu bar; can launch at login with your permission.
+- Stays in the menu bar and in a small screen-edge handle, even after closing the drawer.
+- Snaps the draggable handle to any edge or connected display; retains its placement.
+- Opens with a click, inward scroll or Control + Option + H; hides with Escape, outward scroll or another click.
+- Nudges the handle three times for an approaching deadline, with optional sound and a Reduce Motion fallback.
+- Offers a setup checklist for Calendar, notifications and automatic start, with direct routes to system permissions.
+- Supports weekday and overnight-shift schedules in the Mac's time zone.
 - Opens a Control Center-inspired panel with native glass modules. Uses Liquid Glass on macOS 26, visual-effect materials on macOS 14-15.
 - Shows the next meeting with a countdown and a safe HTTPS join link.
 - Keeps personal follow-up states separate from source-system task states: active, waiting, snoozed, complete.
@@ -26,7 +31,7 @@ The screenshot is from the running native app with synthetic data. Window-only c
 | Source | Supported scope | Setup |
 |---|---|---|
 | Mac Calendar | Selected calendars, next 7 days, timed/non-declined events | macOS Calendar permission |
-| Google Calendar | Primary calendar, next 7 days, up to 250 timed events | Import Desktop OAuth JSON or use a publisher-configured build |
+| Direct Google Calendar | Primary calendar, next 7 days, up to 250 timed events | Publisher-configured build; developer setup is separate |
 | Gmail | Up to 50 matching threads, plus up to 50 waiting threads | Same Google sign-in; works alongside Mac Calendar |
 | Slack | Up to 100 matches for a user-defined search | Internal user OAuth token with `search:read` |
 | Jira Cloud | Up to 100 unfinished issues assigned to you | Site, account email, unscoped personal API token |
@@ -57,13 +62,15 @@ The build script signs locally with an **ad-hoc signature** unless `SIGNING_IDEN
 
 ## First run
 
-1. Try sample data or create a local reminder using **+**.
-2. Open **Settings → General**, allow notifications, and send the five-second test.
-3. Enable **Launch at login** if desired. Install the app in a stable location before enabling it.
-4. Connect Mac Calendar, or configure Google/Slack/Jira using [the setup guide](docs/SETUP.md).
-5. Set work hours and meeting lead time. Work hours currently apply every day in this Mac's time zone.
+1. Open **Settings → General → Set up my Mac**. This requests Calendar/notification permission and enables automatic start. macOS may ask for approval.
+2. Choose calendars under **Connections**. Google, Outlook, Exchange and iCloud calendars already synced to Calendar.app use the same macOS permission. **Add Google, Outlook or Exchange calendar** opens Internet Accounts directly.
+3. Send the five-second notification test and preview the edge nudge.
+4. Close Settings. Drag the handle to your preferred edge or display; click to open your day. Use **+** for a local reminder.
+5. Set working days/hours, meeting lead time, privacy and sound preferences as needed.
 
-Click the pin to keep the panel visible when clicking elsewhere. Escape hides it. Closing Settings keeps Holdlet running; **Quit Holdlet** exits. Joining opens the link, and does not prove you actually attended a call.
+Click the pin to keep the drawer visible when clicking elsewhere. Closing the drawer or Settings keeps Holdlet running; **Quit Holdlet** intentionally exits. Automatic start launches it at the next login, not after an intentional quit. Joining opens a link; it does not prove attendance.
+
+Gmail, Slack and Jira are shown with their actual availability. No developer-console work is required by ordinary users. Contributors testing internal integrations can use **Diagnostics → Developer connections** and [the advanced setup guide](docs/SETUP.md).
 
 ## Privacy and reliability
 
@@ -73,9 +80,10 @@ Click the pin to keep the panel visible when clicking elsewhere. Escape hides it
 - Network requests go to explicitly connected providers. Google OAuth uses the system browser, PKCE/state and a temporary IPv4 loopback listener. No mail bodies are fetched for the current UI.
 - No telemetry, ads, hidden AI calls, automatic sending, Jira updates, or notification-center scraping.
 - Disconnect removes a provider's local items and local credentials, and reconciles pending reminders. Provider-side token revocation is separate.
+- Custom edge cues use their own sound preference and work schedule; macOS Focus controls system notifications. Local focus sessions silence incoming-message cues, while deadlines still surface.
 - Focus, notification permission, sleep and system policies affect delivery. The app cannot promise an alert while the Mac is powered off. It reconciles on wake and surfaces overdue local work.
 
-See [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and [security policy](SECURITY.md).
+See [product contract](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and [security policy](SECURITY.md).
 
 ## Contribute
 

@@ -94,6 +94,10 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var meetingLeadMinutes = 5
     public var onboardingComplete = false
     public var panelPinned = false
+    public var edgeDock: EdgeDockPreferences?
+    public var workdays: [Int]?
+    public var globalShortcutEnabled: Bool?
+    public var dock: EdgeDockPreferences { edgeDock ?? EdgeDockPreferences() }
     public var usesGoogleCalendar: Bool { googleEnabled && (googleCalendarEnabled ?? !calendarEnabled) }
     public mutating func selectMacCalendar() { calendarEnabled = true; googleCalendarEnabled = false }
     public mutating func selectGoogleCalendar(_ enabled: Bool) {

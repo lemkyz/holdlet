@@ -11,7 +11,7 @@ Atomic local snapshot + Keychain credentials
                ↓
 ReminderPlanner → notification reconciliation
                ↓
-Menu bar / native glass panel / Settings
+Menu bar / edge handle / native glass drawer / Settings
 ```
 
 ## Targets
@@ -47,3 +47,11 @@ The OS controls notification presentation and sleep behavior. No Critical Alert 
 ## Design
 
 The approved reference is macOS Control Center: distinct rounded translucent modules, circular symbols, capsule actions and system text. Neutral materials inherit desktop tones. macOS 26 uses SwiftUI Liquid Glass; older supported systems use `NSVisualEffectView`. Typography remains opaque and supports native accessibility. The pet is deliberately a later optional surface; it does not own scheduling logic.
+
+## Presence and cues
+
+`EdgeDockController` owns a separate non-key NSPanel for the handle. It does not require Accessibility or Screen Recording permission. The drawer remains a separate key-capable panel; custom cues animate the handle without opening it or stealing focus. Placement uses normalized position and display ID, clamped within the display's visible frame. A disconnected display falls back to an available screen.
+
+`EdgeLayout`, `WorkSchedule`, `AttentionCuePlanner` and `IncomingCueTracker` are pure core policies. Deadline cue IDs incorporate the deadline, so a rescheduled meeting is eligible again. A local UserDefaults ledger prevents repeat delivery across normal relaunches. Incoming providers establish a first-success baseline; later incoming fingerprints can cue. Custom cues and macOS notifications are separate delivery channels. Incoming-message cues are quiet during a local focus session; deadlines remain eligible.
+
+The global shortcut uses OS hot-key registration, not global keystroke monitoring. Registration failure is visible in Settings. Public user connection setup and internal developer credential setup are separated.

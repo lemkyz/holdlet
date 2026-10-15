@@ -7,6 +7,7 @@ final class CalendarConnector {
     let store = EKEventStore()
     var availableCalendars: [EKCalendar] { store.calendars(for: .event).sorted { $0.title < $1.title } }
     var authorized: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
+    var needsSettings: Bool { [.denied, .restricted].contains(EKEventStore.authorizationStatus(for: .event)) }
     func authorize() async throws -> Bool { try await store.requestFullAccessToEvents() }
     func fetch(calendarIDs: [String], now: Date) throws -> [AttentionItem] {
         guard authorized else { throw APIError.provider("calendar_permission_required") }

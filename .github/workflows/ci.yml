@@ -22,6 +22,8 @@ jobs:
         run: ./scripts/build-app.sh
       - name: Normal app startup smoke test
         run: ./scripts/smoke-app.sh
+      - name: Preview release preflight
+        run: ./scripts/preflight.sh --preview
       - name: Verify bundle
         run: |
           plutil -lint dist/Holdlet.app/Contents/Info.plist

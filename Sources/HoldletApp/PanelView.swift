@@ -52,6 +52,8 @@ struct PanelView: View {
             Button { adding.toggle() } label: { Image(systemName: "plus") }
                 .buttonStyle(.plain).help(model.text("Add reminder", "Hatırlatma ekle"))
                 .accessibilityLabel(model.text("Add reminder", "Hatırlatma ekle"))
+            Button { model.hidePanel?() } label: { Image(systemName: "chevron.up") }
+                .buttonStyle(.plain).accessibilityLabel(model.text("Hide to screen edge", "Ekran kenarına gizle"))
             Button { model.showSettings?() } label: { Image(systemName: "gearshape") }
                 .buttonStyle(.plain).help(model.text("Settings", "Ayarlar"))
                 .accessibilityLabel(model.text("Settings", "Ayarlar"))
@@ -121,7 +123,7 @@ struct PanelView: View {
                     }
                 }
                 if !model.preferences.calendarEnabled && !model.preferences.googleEnabled {
-                    Button(model.text("Connect a calendar", "Takvim bağla")) { model.showSettings?() }.buttonStyle(CapsuleAction())
+                    Button(model.text("Connect a calendar", "Takvim bağla")) { model.openConnections() }.buttonStyle(CapsuleAction())
                 }
             }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(20).glassSurface()

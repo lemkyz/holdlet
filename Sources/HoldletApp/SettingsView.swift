@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var connecting = false
     @State private var confirmReset = false
     @State private var importedGoogleClient = false
+    @State private var showAdvanced = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,18 +35,24 @@ struct SettingsView: View {
             if model.googleSigningIn {
                 HStack { ProgressView().controlSize(.small); Text(model.text("Finish signing in in your browser…", "Tarayıcıda girişini tamamla…")); Spacer(); Button(model.text("Cancel", "İptal")) { model.googleAuth.cancel() } }.padding(12)
             }
-            TabView {
-                general.tabItem { Label(model.text("General", "Genel"), systemImage: "slider.horizontal.3") }
-                connections.disabled(model.demoInstance).tabItem { Label(model.text("Connections", "Bağlantılar"), systemImage: "link") }
-                rules.tabItem { Label(model.text("Rules", "Kurallar"), systemImage: "line.3.horizontal.decrease.circle") }
-                privacy.tabItem { Label(model.text("Privacy", "Gizlilik"), systemImage: "hand.raised") }
-                diagnostics.tabItem { Label(model.text("Diagnostics", "Tanılama"), systemImage: "stethoscope") }
+            TabView(selection: $model.settingsPage) {
+                general.tabItem { Label(model.text("General", "Genel"), systemImage: "slider.horizontal.3") } .tag("general")
+                connections.disabled(model.demoInstance).tabItem { Label(model.text("Connections", "Bağlantılar"), systemImage: "link") } .tag("connections")
+                rules.tabItem { Label(model.text("Rules", "Kurallar"), systemImage: "line.3.horizontal.decrease.circle") } .tag("rules")
+                privacy.tabItem { Label(model.text("Privacy", "Gizlilik"), systemImage: "hand.raised") } .tag("privacy")
+                diagnostics.tabItem { Label(model.text("Diagnostics", "Tanılama"), systemImage: "stethoscope") } .tag("diagnostics")
             }.padding(14)
             Link(model.text("Connection setup guide", "Adım adım bağlantı kurulumu"), destination: URL(string: model.preferences.language == "tr"
                 ? "https://github.com/lemkyz/holdlet/blob/main/docs/KURULUM.tr.md"
                 : "https://github.com/lemkyz/holdlet/blob/main/docs/SETUP.md")!)
-                .font(.system(size: 12)).padding(.bottom, 12)
+                .font(.system(size: 12)).foregroundStyle(.secondary).padding(.bottom, 12)
         }.frame(minWidth: 620, idealWidth: 660, minHeight: 570, idealHeight: 650)
+        .sheet(isPresented: $showAdvanced) {
+            VStack(spacing: 0) {
+                HStack { Text(model.text("Developer connections", "Geliştirici bağlantıları")).font(.headline); Spacer(); Button(model.text("Done", "Bitti")) { showAdvanced = false } }.padding(20)
+                developer.disabled(model.demoInstance)
+            }.frame(width: 640, height: 620)
+        }
         .onAppear {
             googleClientID = model.preferences.googleClientID
             if googleClientID.isEmpty, let bundled = model.bundledGoogleConfiguration {
@@ -60,35 +67,154 @@ struct SettingsView: View {
     private var general: some View {
         Form {
             Section {
-                Picker(model.text("Language", "Dil"), selection: preference(\.language)) {
-                    Text("English").tag("en"); Text("Türkçe").tag("tr")
-                }
-                Toggle(model.text("Launch at login", "Girişte başlat"), isOn: Binding(
-                    get: { SMAppService.mainApp.status == .enabled }, set: { model.setLaunchAtLogin($0) })).disabled(model.demoInstance)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(model.text("Your work, within reach.", "İşlerin hep elinin altında.")).font(.system(size: 23, weight: .medium))
+                    Text(model.text("Holdlet lives in the menu bar and at the screen edge. You can close this window.",
+                        "Holdlet menü çubuğunda ve ekran kenarında kalır. Bu pencereyi kapatabilirsin.")).foregroundStyle(.secondary)
+                    if !model.preferences.onboardingComplete {
+                        Button(model.preparing ? model.text("Preparing…", "Hazırlanıyor…") : model.text("Set up my Mac", "Mac'imi hazırla")) {
+                            Task { await model.prepareMac() }
+                        }.buttonStyle(CapsuleAction(primary: true)).disabled(model.preparing || model.demoInstance)
+                        Text(model.text("Requests Calendar and notification permission, and enables launch at login. macOS asks for your approval where needed.",
+                            "Takvim ve bildirim iznini ister, girişte başlatmayı açar. Gerektiğinde macOS onayını sen verirsin.")).font(.caption).foregroundStyle(.secondary)
+                    }
+                }.padding(.vertical, 8)
+                readinessRow(model.text("Calendar", "Takvim"), ready: model.calendar.authorized && model.preferences.calendarEnabled,
+                    action: model.text("Connect", "Bağla")) { Task { await model.enableCalendar() } }
+                readinessRow(model.text("Notifications", "Bildirimler"), ready: model.preferences.notificationsEnabled && model.notificationsAllowed,
+                    action: model.text("Allow", "İzin ver")) { Task { await model.enableNotifications() } }
+                readinessRow(model.text("Start automatically", "Otomatik başlat"), ready: SMAppService.mainApp.status == .enabled,
+                    action: model.text("Enable", "Aç")) { model.setLaunchAtLogin(true) }
                 if SMAppService.mainApp.status == .requiresApproval {
-                    Text(model.text("Approve Holdlet in System Settings → General → Login Items.", "Sistem Ayarları → Genel → Giriş Öğeleri'nde Holdlet'e izin ver.")).font(.caption)
+                    Button(model.text("Approve in Login Items", "Giriş Öğeleri'nde onayla")) { SMAppService.openSystemSettingsLoginItems() }
                 }
-                Toggle(model.text("Show sample data", "Örnek verileri göster"), isOn: preference(\.demoMode))
-            } header: { Text("Holdlet") }
+            } header: { Text(model.text("Ready for every day", "Her gün hazır")) }
             Section {
-                LabeledContent(model.text("Permission", "İzin"), value: model.notificationStatus)
+                Toggle(model.text("Keep a handle at the screen edge", "Ekran kenarında tutamak göster"), isOn: dockPreference(\.enabled))
+                Picker(model.text("Screen edge", "Ekran kenarı"), selection: dockPreference(\.edge)) {
+                    ForEach(ScreenEdge.allCases, id: \.self) { Text(edgeName($0)).tag($0) }
+                }
+                Text(model.text("Drag the handle to another edge or display. Click it to open or hide Holdlet. Escape also hides the panel.",
+                    "Tutamağı başka bir kenara veya monitöre sürükle. Tıklayarak Holdlet'i aç veya gizle. Escape de paneli gizler.")).font(.caption).foregroundStyle(.secondary)
+                Toggle(model.text("Nudge the handle for reminders", "Hatırlatmada tutamağı hareket ettir"), isOn: dockPreference(\.alerts))
+                Toggle(model.text("Play a reminder sound", "Hatırlatma sesi çal"), isOn: dockPreference(\.sound))
+                Button(model.text("Preview the nudge", "Tutamağı dene")) { model.previewEdge?() }.disabled(!model.preferences.dock.enabled)
+                Text(model.text("Three small nudges, with a static highlight when Reduce Motion is on. Focus sessions silence incoming-message nudges; deadlines still appear. System Focus controls macOS notifications.",
+                    "Üç küçük hareket; Hareketi Azalt açıksa sabit işaret. Odak oturumunda yeni mesajlar sessiz kalır, son tarihler görünür. macOS bildirimlerini sistemin Odak ayarı yönetir.")).font(.caption).foregroundStyle(.secondary)
+            } header: { Text(model.text("Always within reach", "Hep görünür")) }
+            Section {
+                Picker(model.text("Language", "Dil"), selection: preference(\.language)) { Text("English").tag("en"); Text("Türkçe").tag("tr") }
+                Toggle(model.text("Launch at login", "Girişte başlat"), isOn: Binding(get: { SMAppService.mainApp.status == .enabled }, set: { model.setLaunchAtLogin($0) })).disabled(model.demoInstance)
+                Toggle(model.text("Schedule macOS notifications", "macOS bildirimlerini planla"), isOn: Binding(get: { model.preferences.notificationsEnabled }, set: { enabled in
+                    if enabled { Task { await model.enableNotifications() } } else { model.updatePreferences { $0.notificationsEnabled = false } }
+                }))
                 HStack {
-                    Button(model.text("Enable notifications", "Bildirimleri aç")) { Task { await model.enableNotifications() } }
+                    Button(model.text("Notification settings", "Bildirim ayarları")) { openSystemSettings("com.apple.Notifications-Settings.extension") }
                     Button(model.text("Send test in 5 seconds", "5 saniye sonra test gönder")) { Task { await model.testNotification() } }.disabled(!model.preferences.notificationsEnabled)
                 }
-                Toggle(model.text("Schedule reminders", "Hatırlatmaları planla"), isOn: preference(\.notificationsEnabled))
-                Text(model.text("Notifications follow your macOS Focus and notification settings. Test with your usual full-screen and display setup.",
-                    "Bildirimler macOS Odak ve bildirim ayarlarına uyar. Kullandığın tam ekran ve monitör düzeninde test et.")).font(.caption).foregroundStyle(.secondary)
-            } header: { Text(model.text("Notifications", "Bildirimler")) }
-            Section {
-                Button(model.text("Finish setup", "Kurulumu tamamla")) { model.completeOnboarding(); model.showPanel?() }
-                Text("Holdlet 0.1.2-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
-            }
+                Toggle(model.text("Open anywhere with Control + Option + H", "Control + Option + H ile her yerden aç"), isOn: Binding(get: { model.preferences.globalShortcutEnabled ?? true }, set: { enabled in model.updatePreferences { $0.globalShortcutEnabled = enabled } }))
+                if (model.preferences.globalShortcutEnabled ?? true) && !model.shortcutAvailable {
+                    Text(model.text("This shortcut is unavailable. Another app may already use it; the menu icon and edge handle still work.", "Kısayol kullanılamıyor. Başka bir uygulama kullanıyor olabilir; menü simgesi ve tutamak çalışmaya devam eder.")).font(.caption).foregroundStyle(.secondary)
+                }
+                Toggle(model.text("Show sample data", "Örnek verileri göster"), isOn: preference(\.demoMode))
+                Text("Holdlet 0.2.0-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
+            } header: { Text(model.text("Preferences", "Tercihler")) }
         }.formStyle(.grouped)
     }
 
+    private func readinessRow(_ title: String, ready: Bool, action: String, perform: @escaping () -> Void) -> some View {
+        HStack {
+            Label(title, systemImage: ready ? "checkmark.circle.fill" : "circle")
+            Spacer()
+            if ready { Text(model.text("Ready", "Hazır")).font(.caption).foregroundStyle(.secondary) }
+            else { Button(action, action: perform).disabled(model.demoInstance || model.preparing) }
+        }
+    }
+    private func edgeName(_ edge: ScreenEdge) -> String {
+        switch edge {
+        case .top: model.text("Top", "Üst")
+        case .bottom: model.text("Bottom", "Alt")
+        case .left: model.text("Left", "Sol")
+        case .right: model.text("Right", "Sağ")
+        }
+    }
+    private func dockPreference<T>(_ path: WritableKeyPath<EdgeDockPreferences, T>) -> Binding<T> {
+        Binding(get: { model.preferences.dock[keyPath: path] }, set: { value in
+            model.updatePreferences { prefs in var dock = prefs.dock; dock[keyPath: path] = value; prefs.edgeDock = dock }
+        })
+    }
+    private func openSystemSettings(_ pane: String) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:" + pane)!) }
+
     private var connections: some View {
         Form {
+            Section {
+                Text(model.text("Connect once. Keep your day in view.", "Bir kez bağla, gününü takip et.")).font(.system(size: 22, weight: .medium)).padding(.vertical, 6)
+                Text(model.text("Calendar permission is handled by macOS. Account sign-in opens your browser when that service is available in this build.",
+                    "Takvim iznini macOS verir. Bu pakette hazır olan hesap bağlantıları giriş için tarayıcını açar.")).font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                connectionStatus(.calendar)
+                if model.preferences.calendarEnabled && model.calendar.authorized {
+                    DisclosureGroup(model.text("Choose calendars", "Takvimleri seç")) {
+                        ForEach(model.calendar.availableCalendars, id: \.calendarIdentifier) { calendar in
+                            Toggle(calendar.title, isOn: Binding(get: {
+                                model.preferences.selectedCalendarIDs.isEmpty || model.preferences.selectedCalendarIDs.contains(calendar.calendarIdentifier)
+                            }, set: { checked in
+                                var ids = model.preferences.selectedCalendarIDs
+                                if ids.isEmpty { ids = model.calendar.availableCalendars.map(\.calendarIdentifier) }
+                                ids.removeAll { $0 == calendar.calendarIdentifier }
+                                if checked { ids.append(calendar.calendarIdentifier) }
+                                if ids.isEmpty { ids = ["__none__"] }
+                                model.updatePreferences { $0.selectedCalendarIDs = ids }; Task { await model.sync() }
+                            }))
+                        }
+                    }
+                    Button(model.text("Disconnect calendar", "Takvim bağlantısını kaldır")) { model.disconnect(.calendar) }
+                } else {
+                    Button(model.text("Allow calendar access", "Takvim erişimine izin ver")) { Task { await model.enableCalendar() } }
+                    if !model.calendar.authorized {
+                        Button(model.text("Open Calendar permission", "Takvim iznini aç")) { openSystemSettings("com.apple.preference.security?Privacy_Calendars") }
+                    }
+                }
+                Button(model.text("Add Google, Outlook or Exchange calendar", "Google, Outlook veya Exchange takvimi ekle")) {
+                    openSystemSettings("com.apple.Internet-Accounts-Settings.extension")
+                }
+                Text(model.text("Calendars already on this Mac work with one permission. Add another account in Internet Accounts, then enable Calendar for it.",
+                    "Bu Mac'teki takvimler tek izinle çalışır. Yeni hesabı İnternet Hesapları'na ekleyip Takvim'i açabilirsin.")).font(.caption).foregroundStyle(.secondary)
+            } header: { Text(model.text("Meetings · Google Meet, Teams, Zoom", "Toplantılar · Google Meet, Teams, Zoom")) }
+            Section {
+                connectionStatus(.gmail)
+                if model.preferences.googleEnabled {
+                    Button(model.text("Sign in again", "Yeniden giriş yap")) { Task { await model.reconnectGoogle() } }.disabled(model.googleSigningIn)
+                    Toggle(model.text("Also use direct Google Calendar", "Doğrudan Google Takvim'i de kullan"), isOn: Binding(get: { model.preferences.usesGoogleCalendar }, set: { model.useGoogleCalendar($0) }))
+                    Button(model.text("Disconnect Gmail", "Gmail bağlantısını kaldır")) { model.disconnect(.gmail) }
+                } else if let config = model.bundledGoogleConfiguration {
+                    Button(model.text("Continue with Google", "Google ile devam et")) { Task { await model.connectGoogle(clientID: config.clientID, clientSecret: config.clientSecret) } }.disabled(model.googleSigningIn)
+                } else {
+                    Label(model.text("Publisher setup pending", "Yayıncı bağlantısı hazırlanıyor"), systemImage: "clock")
+                    Text(model.text("Gmail sign-in is not available in this preview package. Calendar connections work now. You do not need to create a developer project.",
+                        "Bu önizleme paketinde Gmail girişi henüz hazır değil. Takvim bağlantısı kullanılabilir. Bir geliştirici projesi oluşturman gerekmiyor.")).font(.caption).foregroundStyle(.secondary)
+                }
+            } header: { Text(model.text("Important mail", "Önemli mailler")) }
+            Section {
+                connectionStatus(.slack)
+                if model.preferences.slackEnabled { Button(model.text("Disconnect Slack", "Slack bağlantısını kaldır")) { model.disconnect(.slack) } }
+                else { Text(model.text("Workspace sign-in is waiting for the publisher's Slack application. Your organization may need to approve it.",
+                    "Çalışma alanıyla giriş için yayıncının Slack uygulaması gerekiyor. Kuruluşun ayrıca onay isteyebilir.")).font(.caption).foregroundStyle(.secondary) }
+                connectionStatus(.jira)
+                if model.preferences.jiraEnabled { Button(model.text("Disconnect Jira", "Jira bağlantısını kaldır")) { model.disconnect(.jira) } }
+                else { Text(model.text("Jira account sign-in is pending publisher registration. Internal developer connections are available under Advanced.",
+                    "Jira hesap girişi yayıncı kaydını bekliyor. Kurum içi geliştirici bağlantıları Gelişmiş bölümünde.")).font(.caption).foregroundStyle(.secondary) }
+            } header: { Text(model.text("Workspace", "Çalışma alanı")) }
+        }.formStyle(.grouped)
+    }
+
+    private var developer: some View {
+        Form {
+            Section {
+                Text(model.text("For contributors and internal deployments. Ordinary users should use Connections; publisher registrations belong in the release build.",
+                    "Katkı verenler ve kurum içi dağıtımlar için. Normal kullanım Bağlantılar ekranındadır; yayıncı kayıtları sürüm paketine aittir.")).font(.caption)
+            } header: { Text(model.text("Developer connections", "Geliştirici bağlantıları")) }
             Section {
                 connectionStatus(.calendar)
                 if model.preferences.calendarEnabled {
@@ -196,16 +322,20 @@ struct SettingsView: View {
                 Toggle(model.text("Only alert within work hours", "Yalnızca çalışma saatlerinde uyar"), isOn: preference(\.respectWorkHours))
                 Picker(model.text("Start", "Başlangıç"), selection: preference(\.workStart)) { ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) } }
                 Picker(model.text("End", "Bitiş"), selection: preference(\.workEnd)) { ForEach(1...24, id: \.self) { Text(String(format: "%02d:00", $0)).tag($0) } }
-                if model.preferences.workStart >= model.preferences.workEnd {
-                    Text(model.text("Start must be earlier than end. Overnight schedules are not supported in this alpha.", "Başlangıç bitişten önce olmalı. Bu alfada geceye taşan mesai desteklenmez.")).foregroundStyle(.orange).font(.caption)
-                }
-                Text(model.text("Hours use this Mac's time zone, every day. Items outside the window remain in the panel but do not trigger alerts. Weekday schedules are planned.",
-                    "Saatler bu Mac'in saat diliminde her gün uygulanır. Mesai dışındaki işler panelde kalır ama uyarı vermez. Gün bazlı mesai sonraki sürümdedir.")).font(.caption)
+                Text(model.text("Overnight shifts are supported. Equal start and end mean all day. Hours follow this Mac's time zone.", "Geceye taşan mesai desteklenir. Başlangıç ve bitiş aynıysa tüm gün. Saatler bu Mac'in saat dilimini izler.")).font(.caption)
                 Picker(model.text("Meeting reminder", "Toplantı hatırlatması"), selection: preference(\.meetingLeadMinutes)) {
                     ForEach([0, 2, 5, 10, 15], id: \.self) { Text("\($0) " + model.text("minutes before", "dakika önce")).tag($0) }
                 }
+                ForEach(1...7, id: \.self) { day in
+                    Toggle(Calendar.current.weekdaySymbols[day - 1], isOn: Binding(get: { (model.preferences.workdays ?? Array(1...7)).contains(day) }, set: { enabled in
+                        var days = model.preferences.workdays ?? Array(1...7)
+                        days.removeAll { $0 == day }; if enabled { days.append(day) }
+                        model.updatePreferences { $0.workdays = days.sorted() }
+                    }))
+                }
             } header: { Text(model.text("Timing", "Zamanlama")) }
             Section {
+                DisclosureGroup(model.text("Advanced search filters", "Gelişmiş arama filtreleri")) {
                 TextField(model.text("Gmail search query", "Gmail arama sorgusu"), text: $gmailQuery)
                 TextField(model.text("Slack search query", "Slack arama sorgusu"), text: $slackQuery)
                 Button(model.text("Save search rules", "Arama kurallarını kaydet")) {
@@ -214,6 +344,7 @@ struct SettingsView: View {
                 }
                 Text(model.text("Gmail: unread important mail from the last 7 days. Slack: use native search syntax; narrow the query if the service reports too many results. Sync runs every 3 minutes while awake.",
                     "Gmail: son 7 günün okunmamış önemli mailleri. Slack: kendi arama sözdizimini kullan; çok sonuç varsa sorguyu daralt. Mac uyanıkken 3 dakikada bir eşitlenir.")).font(.caption)
+                }
             } header: { Text(model.text("What needs attention", "İlgilenilecek işler")) }
             Section {
                 Text(model.text("Reading is not completing. Put a Gmail thread in Waiting for reply to watch for a new incoming message; it returns to your active list on the next successful sync. Slack reply tracking is manual. Jira dates use 17:00 in your Mac's time zone.",
@@ -249,6 +380,7 @@ struct SettingsView: View {
                     "Bağlantı hatasında son başarılı veriler korunur. Eski veriler, yeni iş gelmediği anlamına gelmez.")).font(.caption)
             } header: { Text(model.text("Connection health", "Bağlantı sağlığı")) }
             Section {
+                Button(model.text("Developer connections…", "Geliştirici bağlantıları…")) { showAdvanced = true }
                 Button(model.text("Show local data folder", "Yerel veri klasörünü göster")) { NSWorkspace.shared.activateFileViewerSelecting([model.stateFileURL]) }
                 Button(model.text("Open notification settings", "Bildirim ayarlarını aç")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!) }
                 Button(model.text("Export redacted diagnostics…", "İçeriksiz tanılama dışa aktar…")) { exportDiagnostics() }
@@ -294,7 +426,7 @@ struct SettingsView: View {
     private func exportDiagnostics() {
         let panel = NSSavePanel(); panel.nameFieldStringValue = "holdlet-diagnostics.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let data: [String: Any] = ["version": "0.1.2-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
+        let data: [String: Any] = ["version": "0.2.0-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "itemCount": model.snapshot.items.count, "sources": model.enabledSources.map { source in
                 ["source": source.rawValue, "hasError": model.snapshot.health[source.rawValue]?.isError ?? false,
                  "lastSuccess": model.snapshot.health[source.rawValue]?.lastSuccess.map { ISO8601DateFormatter().string(from: $0) } ?? "never"] as [String: Any]

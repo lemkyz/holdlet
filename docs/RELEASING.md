@@ -30,3 +30,11 @@ Then recreate the ZIP from the stapled bundle and test on a clean Mac. Release n
 ## CI
 
 The CI artifact is an unsigned/ad-hoc **developer build**, not a notarized installer. Test and build run on a macOS runner. Public releases with trusted signatures require separate account-provided credentials and an explicitly configured release workflow.
+
+## Public-beta gate
+
+Run `./scripts/preflight.sh --preview` for the current developer package. It verifies bundle structure and code signature without claiming trusted installation or provider acceptance.
+
+Run `./scripts/preflight.sh --public-beta` before calling a download a public beta. It fails for a missing Developer ID Application signature, missing stapled notarization ticket or missing publisher Google client configuration. It never prints client values. This is an automated subset of release acceptance, not proof of verified provider consent or Slack/Jira availability. Finish the live-account, clean-machine and tenant-policy checks in VALIDATION.md and STATUS.md.
+
+Internal client/token fields belong under Diagnostics → Developer connections. Ordinary users must not be sent to developer consoles to finish onboarding.

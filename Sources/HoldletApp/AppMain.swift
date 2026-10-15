@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var state: AppState!
     private var statusTimer: Timer?
     private var dismissMonitor: Any?
+    private var dock: EdgeDockController?
+    private var presenceSubscription: AnyCancellable?
+    private let shortcut = GlobalShortcut()
+    private var shortcutEnabled = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
@@ -22,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         state = AppState(demoInstance: demo)
         state.showPanel = { [weak self] in self?.showPanel() }
         state.showSettings = { [weak self] in self?.showSettings() }
+        state.hidePanel = { [weak self] in self?.panel.orderOut(nil) }
+        state.previewEdge = { [weak self] in self?.dock?.preview() }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "circle.grid.2x2.fill", accessibilityDescription: "Holdlet")
@@ -35,6 +41,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = true; panel.delegate = self
         panel.contentView = NSHostingView(rootView: PanelView(model: state))
+        dock = EdgeDockController(model: state)
+        dock?.onToggle = { [weak self] in
+            guard let self else { return }
+            if self.panel.isVisible { self.panel.orderOut(nil) } else { self.showPanel() }
+        }
+        dock?.onExpand = { [weak self] in self?.showPanel() }
+        dock?.onCollapse = { [weak self] in self?.panel.orderOut(nil) }
+        dock?.onPlacementChanged = { [weak self] in
+            guard let self, self.panel.isVisible else { return }; self.showPanel(activate: false)
+        }
+        shortcut.onPress = { [weak self] in
+            guard let self else { return }
+            if self.panel.isVisible { self.panel.orderOut(nil) } else { self.showPanel() }
+        }
+        updateShortcut()
+        presenceSubscription = state.$snapshot.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateStatus(); self?.updateShortcut() }
+        }
         dismissMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in
                 guard let self, !self.state.preferences.panelPinned else { return }; self.panel.orderOut(nil)
@@ -44,7 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             Task { @MainActor in self?.updateStatus() }
         }
         updateStatus()
-        if !state.preferences.onboardingComplete || demo || CommandLine.arguments.contains("--show") { showPanel() }
+        if !state.preferences.onboardingComplete && !demo { showSettings() }
+        else if demo || CommandLine.arguments.contains("--show") { showPanel() }
         if CommandLine.arguments.contains("--smoke-test") {
             showPanel()
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -67,7 +92,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func settingsFromMenu() { showSettings() }
     @objc private func quit() { NSApp.terminate(nil) }
 
-    private func showPanel() {
+    private func showPanel(activate: Bool = true) {
+        dock?.acknowledge()
+        if state.preferences.dock.enabled, let frame = dock?.drawerFrame {
+            let opening = !panel.isVisible
+            let animate = opening && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            if animate {
+                var start = frame
+                switch state.preferences.dock.edge {
+                case .top: start.origin.y += 14
+                case .bottom: start.origin.y -= 14
+                case .left: start.origin.x -= 14
+                case .right: start.origin.x += 14
+                }
+                panel.setFrame(start, display: true); panel.alphaValue = 0
+                panel.orderFrontRegardless()
+                NSAnimationContext.runAnimationGroup({ context in
+                    context.duration = 0.18
+                    panel.animator().setFrame(frame, display: true); panel.animator().alphaValue = 1
+                }, completionHandler: nil)
+            } else { panel.setFrame(frame, display: true); panel.alphaValue = 1; panel.orderFrontRegardless() }
+            if activate { panel.makeKey(); NSApp.activate(ignoringOtherApps: true) }
+            return
+        }
         guard let button = statusItem.button, let window = button.window else { return }
         let buttonRect = window.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = window.screen ?? NSScreen.main
@@ -89,6 +136,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         settings?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
+    private func updateShortcut() {
+        let enabled = state.preferences.globalShortcutEnabled ?? true
+        guard enabled != shortcutEnabled else { return }
+        shortcutEnabled = enabled
+        if enabled { state.shortcutAvailable = shortcut.register() }
+        else { shortcut.stop(); state.shortcutAvailable = false }
+    }
     private func updateStatus() {
         guard let button = statusItem.button else { return }
         if let meeting = state.nextMeeting, let date = meeting.dueAt {
@@ -104,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showPanel(); return true }
     func applicationWillTerminate(_ notification: Notification) {
         if let dismissMonitor { NSEvent.removeMonitor(dismissMonitor) }
+        shortcut.stop(); dock?.stop(); statusTimer?.invalidate(); presenceSubscription?.cancel()
         state.googleAuth.cancel()
     }
 }

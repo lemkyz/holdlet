@@ -1,24 +1,25 @@
 # Holdlet - adım adım bağlantı kurulumu
 
-Bu geliştirici alfasında hazır bir ortak OAuth uygulaması yok. Kendi hesaplarınla deneme yapmak için aşağıdaki bilgileri bir kez hazırlıyorsun. İleride genel kullanıma yönelik doğrulanmış giriş akışı bu adımların yerini alacak.
+## Normal kullanım
 
-**Token, istemci sırrı, şifre veya indirilen kimlik JSON dosyasını sohbete ya da GitHub'a ekleme.** Uygulamada ilgili güvenli alana gir. Holdlet erişim anahtarlarını macOS Keychain'e kaydeder. İş başlıkları ve ayarlar yerel dosyada tutulur; bu dosya uygulama tarafından şifrelenmez.
+1. Uygulamayı aç. **Ayarlar → Genel → Mac'imi hazırla** seçeneği Takvim ve bildirim izinlerini ister, girişte başlatmayı açar. macOS gerektiğinde senden onay ister.
+2. **Bağlantılar → Takvim erişimine izin ver** ile Mac'inde eşitlenen takvimleri bağla. Google, Outlook, Exchange ve iCloud için ayrı bir Holdlet geliştirici projesi gerekmez.
+3. Eksik bir hesap varsa **Google, Outlook veya Exchange takvimi ekle** doğrudan İnternet Hesapları ayarını açar. Hesabı ekleyip Takvim eşitlemesini aç.
+4. Takvimleri seç, **Genel** ekranından beş saniyelik bildirim testini ve **Tutamağı dene** seçeneğini kullan.
+5. Ayarlar'ı kapat. Menü simgesi ve tutamak kalır. Tutamağı ekranın dört kenarından birine veya başka monitöre sürükle. Tıklayarak, içeri kaydırarak veya Control + Option + H ile aç; Escape ile gizle.
+6. Çalışma günlerini, mesaiyi ve toplantı hatırlatma süresini **Kurallar** ekranından seç. Gece mesaisi desteklenir.
 
-## Önce uygulamayı normal modda aç
+Normal kurulumda token, JSON veya istemci kimliği istenmez. Bu önizlemede herkese açık Gmail/Slack/Jira hesap girişi yayıncı kaydını bekliyor. Hazır olmayan bir bağlantı çalışıyormuş gibi sunulmaz. Takvim yolu Gmail kutusuna veya Teams sohbetlerine erişmez.
 
-Demo açıkken **Exit / Çık** veya Ayarlar'daki **Normal modu aç** düğmesini kullan. Yeni sürüm normal bir uygulama oturumu açar. Eski demo sürümündeysen menü çubuğu simgesine sağ tıkla → Quit Holdlet; ardından uygulamayı normal aç. Demo oturumunda gerçek hesap bağlantıları bilinçli olarak kapalıdır.
+Önceden reddedilmiş izinde düğme ilgili sistem ayarını açar. Sistem ayarında Holdlet'e izin verdikten sonra uygulamaya dönüp bağlantıyı tekrar dene. Pencereleri kapatmak uygulamayı kapatmaz. Menüden **Çık** seçmek uygulamayı kapatır; girişte başlatma bir sonraki Mac oturum açılışında devreye girer.
 
-Uygulamayı sürekli tutacağın bir yere taşıdıktan sonra aç. Menü çubuğundan Ayarlar → Genel → Dil → Türkçe seç. **Bildirimleri aç**, ardından **5 saniye sonra test gönder** ile dene. Mac Odak modu veya sistem bildirim ayarları uyarıyı etkileyebilir. Başlangıçta çalışması için **Girişte başlat** seçeneğini aç; macOS ek izin isterse Giriş Öğeleri'nden onayla.
+Demo hesabı gerçek bağlantı veya sistem kurulum izni istemez. Normal kullanıma dönmek için **Normal modu aç** seç.
 
-## 1. En hızlı yol: Google Cloud kurmadan takvim
+## Yalnızca geliştirici ve kurum içi test kurulumu
 
-1. Mac'in **Takvim** uygulamasını aç; Google hesabındaki toplantıların burada görünüp görünmediğine bak.
-2. Görünmüyorsa Takvim → Hesap Ekle yoluyla hesabını ekle ve takvim eşitlemesini etkinleştir.
-3. Holdlet → Ayarlar → Bağlantılar → **Mac Calendar** → erişime izin ver.
-4. İzlemek istediğin takvimleri seç.
-5. Gelecekteki saatli bir toplantıyı ekle/değiştir; Holdlet'te Yenile'ye bas. Son başarılı eşitleme zamanını kontrol et.
+Aşağıdaki adımlar normal kullanıcının görevi değildir. Yayıncı kayıtları hazır olana kadar katkı verenlerin adaptörleri sınamasına yöneliktir. Alanlar **Ayarlar → Tanılama → Geliştirici bağlantıları** içindedir.
 
-Bu yol yalnızca takvim içindir; Gmail kutusunu bağlamaz. Holdlet takvimine yazmaz. Gmail'i ayrıca bağlayıp Mac Takvim'i kullanmaya devam edebilirsin. Yalnızca doğrudan Google Takvim kaynağını seçersen yinelenmeyi önlemek için Mac Takvim kaynağı kapatılır.
+**Token, istemci sırrı, şifre veya indirilen kimlik JSON dosyasını sohbete ya da GitHub'a ekleme.** Uygulamadaki güvenli alana gir. Erişim anahtarları Keychain'de tutulur; yerel iş dosyası uygulama tarafından şifrelenmez.
 
 ## 2. Gmail + doğrudan Google Calendar
 
@@ -29,7 +30,7 @@ Hazırlayacağın bilgiler: **Desktop OAuth client ID** ve gerekiyorsa aynı ist
 3. **Google Auth Platform / OAuth consent screen** bölümünde uygulama adı ve destek e-postanı ayarla.
 4. Kişisel test için hedef kitleyi hesabına uygun seç; harici test uygulamasında **Audience → Test users** alanına giriş yapacağın Google hesabını ekle. Şirket hesabındaki yönetici kuralları ayrıca geçerlidir.
 5. **Clients → Create client** içinde türü **Desktop app** seç. Web application seçme.
-6. Oluşan Desktop istemcisinin JSON dosyasını indir. Holdlet → Bağlantılar → Google Workspace → **Google bağlantısını kur** düğmesiyle bu dosyayı seç. Kimlik ve varsa istemci sırrı aynı dosyadan doldurulur. Web istemcisi dosyası kabul edilmez.
+6. Oluşan Desktop istemcisinin JSON dosyasını indir. Holdlet → Tanılama → Geliştirici bağlantıları → Google Workspace → **Google bağlantısını kur** düğmesiyle bu dosyayı seç. Kimlik ve varsa istemci sırrı aynı dosyadan doldurulur. Web istemcisi dosyası kabul edilmez.
 7. **Google ile giriş yap** düğmesine bas. Varsayılan tarayıcıda doğru hesabı seç; istenen salt okunur takvim ve Gmail erişimini inceleyip izin ver.
 8. Holdlet'e dön; Gmail için son başarılı eşitlemeyi kontrol et. Doğrudan Google Takvim'i kullanacaksan ilgili seçeneği aç ve onun eşitlemesini de kontrol et. Apple Takvim zaten bağlıysa başlangıçta korunur.
 
@@ -48,7 +49,7 @@ Hazırlayacağın bilgi: kurumsal izinlere uygun **kullanıcı OAuth tokenı**. 
 1. [Slack uygulamaları](https://api.slack.com/apps) sayfasında kendi çalışma alanın için kurum içi uygulama oluştur/seç. Kurum uygulama kurulumunu sınırlandırıyorsa yöneticinin izin vermesi gerekir.
 2. **OAuth & Permissions → User Token Scopes** bölümüne `search:read` ekle. Bot Token Scopes alanına eklemek bu bağlayıcı için yeterli değildir.
 3. Uygulamayı çalışma alanına kur veya kapsam değiştiyse yeniden yetkilendir. Oluşan **User OAuth Token** değerini al.
-4. Holdlet → Bağlantılar → Slack'teki güvenli token alanına gir.
+4. Holdlet → Tanılama → Geliştirici bağlantıları → Slack'teki güvenli token alanına gir.
 5. Sorguyu başlangıçta `to:me after:{weekAgo}` bırak; Holdlet `{weekAgo}` değerini her eşitlemede yedi gün önceki tarihle değiştirir. İstersen `to:me after:2026-10-01` gibi sabit tarih kullan.
 6. **Test et ve bağla** seç. Hata yoksa token Keychain'e kaydedilir.
 
@@ -63,7 +64,7 @@ Hazırlayacağın bilgiler: `https://sirketin.atlassian.net` adresi, Atlassian h
 1. [Atlassian API tokenları](https://id.atlassian.com/manage-profile/security/api-tokens) sayfasını aç.
 2. Bu alfadaki site tabanlı bağlantı için **Create API token** yolunu kullan. **Create API token with scopes** ile oluşturulan gateway tokenları bu sürümde desteklenmez. Atlassian genel olarak kapsamlı tokenları önerir; bunlar için ayrı gateway/OAuth desteği yol haritasındadır.
 3. Anlaşılır ad ve deneme sürene uygun son kullanma tarihi seç. Tokenı oluştur ve kopyala.
-4. Holdlet → Jira Cloud bölümünde siteyi, hesap e-postanı ve tokenı gir.
+4. Holdlet → Tanılama → Geliştirici bağlantıları → Jira Cloud bölümünde siteyi, hesap e-postanı ve tokenı gir.
 5. **Test et ve bağla** seç; sana atanmış açık işlerin ve bağlantı zamanının geldiğini doğrula.
 
 Jira'ya yazma yapılmaz; ancak tokenın sağlayıcıdaki yetkileri yalnızca uygulamanın yaptığı okuma işlemleriyle sınırlanmış değildir. Tamamlanan Jira işi sonraki başarılı eşitlemede aktif listeden çıkar. Tarih alanındaki günler Mac saat diliminde 17:00 olarak gösterilir. Jira Data Center bu bağlayıcıyla çalışmaz.

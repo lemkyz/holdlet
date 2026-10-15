@@ -7,16 +7,26 @@
 - Demo app launched on macOS; accessibility tree and panel rendering inspected.
 - Demo UI acceptance: focus start/stop changed the live countdown; Settings opened; connection setup was disabled in isolated demo; privacy mode replaced titles/senders; adding a local reminder increased the open-item count.
 - 25 core tests passed locally on the initial implementation.
-- 0.1.2: 38 tests pass, including Desktop OAuth file validation, old-preference migration, independent Gmail/calendar selection and the actual HTTP client's OAuth/API failure handling through a URLProtocol fixture. These tests do not establish successful sign-in to a live Google account.
+- 0.1.2: 38 tests passed, including Desktop OAuth file validation, old-preference migration, independent Gmail/calendar selection and the actual HTTP client's OAuth/API failure handling through a URLProtocol fixture. These tests do not establish successful sign-in to a live Google account.
 - Normal bundled-app startup passes `./scripts/smoke-app.sh` (on a clean test account); this check caught and prevented a normal-domain UserDefaults startup regression. CI runs it after packaging.
 - Core tests cover merge, cancellation, rescheduling, deduplication, reading-vs-completion, incoming Gmail activity, work hours/time zones/DST, snooze/lead times, notification privacy/capacity, persistence permissions/corruption, link host boundaries and synthetic provider decoding.
 
 Run `./scripts/test.sh` for the exact current test count/results. CI runs the same suite, builds the app and uploads an artifact. Adapters have not been authenticated against the user's real accounts in this session; sample-provider decoding is not evidence of a live integration succeeding.
 
+## 0.2 evidence
+
+- 50 tests pass locally in five suites. New coverage includes negative-coordinate displays, small screens, edge snapping, old-state migration, day selection, overnight shifts, stale-deadline suppression, late meeting sync, first-provider baselines, first arrival after an empty sync and new incoming-thread fingerprints.
+- Native demo checks verified the handle opens the drawer, the screen-edge chooser moves it to the right, closing Settings leaves the handle available, the live label updates, and the five primary Settings tabs remain accessible.
+- The handle preview action was invoked. Physical sound, exact animation timing, cross-display dragging and global physical-key delivery are still manual acceptance items.
+- Normal-profile acceptance verified Calendar successful sync, enabled notifications and enabled automatic start together in the readiness checklist. Calendar access needed renewal after the ad-hoc rebuild; no clean-machine or stable-signed-update claim is made.
+- macOS system-settings links are recovery routes; their availability and destination can differ by OS release. Clean-machine permission acceptance remains required.
+
 ## Manual acceptance before relying on it
 
 | Flow | Required check |
 |---|---|
+| Edge surface | Drag to four edges and another screen; unplug display; relaunch; Reduce Motion; no focus theft |
+| Shortcut | Control + Option + H from another foreground app; registration conflict; disable/re-enable |
 | First install | Open `.app`, onboarding visible, no provider requests before connecting |
 | Local reminder | Add, snooze, restart, see expected time, receive one alert |
 | Completion | Complete pending item; its future notification disappears |
