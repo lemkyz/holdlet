@@ -73,3 +73,13 @@ Gmail transport fixtures verify multi-page loading, metadata dates, history-ID p
 Jira transport fixtures verify assigned/reported/watched default JQL, page traversal, deduplication, repeated-cursor rejection and scoped-token gateway routing with ordinary human issue links preserved. Tenant discovery sends no credential. Jira remains unconnected in the live profile until the account owner supplies an approved credential. No live Jira success is inferred from an open browser tab or a test fixture.
 
 The configured local 0.2.2 bundle builds successfully. The Mac was locked when live UI acceptance began; UI and live-account acceptance for this revision remain pending until it is unlocked. Public generic packages do not include the local publisher Google configuration.
+
+## 0.2.3 Keychain responsiveness
+
+After the Mac was unlocked, the connected-profile 0.2.2 app still failed accessibility requests. A native process sample showed its main thread blocked inside SecItemCopyMatching during Google token loading. This was an application responsiveness defect, not successful authentication or merely a locked-screen tool limitation.
+
+All credential operations now run on a dedicated executor. Reads return a bounded waiting error after eight seconds; further work is not queued behind an outstanding system operation. Writes are not abandoned by a read timeout. Google refresh uses an atomic compare-and-replace, and canceled authorization cleans up its matching saved token. Google background access pauses persistently after a Keychain access failure, with an explicit retry action. No Keychain passwords, ACLs, access checks or default keychains are changed by this fix.
+
+65 local tests pass in eleven suites, including worker-thread execution, read timeout, busy rejection, safe late completion and executor recovery using synthetic blocked work without touching the user's Keychain. The configured 0.2.3 app launched, opened its panel and navigated Settings while Google Keychain access remained unavailable. The user's Google checks were paused; live Gmail reacceptance and physical trackpad acceptance remain pending. Calendar access may need renewal after the ad-hoc update.
+
+The SDK also clarifies a previous documentation overstatement: kSecAttrAccessible does not provide its Data Protection access-class guarantee for legacy login-keychain items. ARCHITECTURE.md now states the current storage behavior and remaining signing/Data Protection gate accurately.

@@ -102,7 +102,7 @@ final class AppState: ObservableObject {
         Task { await sync(mailOnly: true) }
     }
     func loadMoreMail() async {
-        guard let cursor = gmailNextPageToken, !loadingMoreMail, !isSyncing else { return }
+        guard let cursor = gmailNextPageToken, !loadingMoreMail, !isSyncing, !googleSigningIn else { return }
         loadingMoreMail = true; isSyncing = true
         defer { loadingMoreMail = false; isSyncing = false }
         let epoch = generation, query = preferences.gmailQuery
@@ -248,6 +248,7 @@ final class AppState: ObservableObject {
             let configuration = try GoogleOAuthConfiguration(clientID: clientID, clientSecret: clientSecret)
             try await googleAuth.authorize(configuration: configuration)
             updatePreferences { $0.connectGoogle(clientID: configuration.clientID) }
+            googleSigningIn = false
             save(); reconcile()
             await sync()
         } catch is CancellationError {
@@ -260,8 +261,12 @@ final class AppState: ObservableObject {
         save(); reconcile(); Task { await sync() }
     }
     func reconnectGoogle() async {
+        if let config = bundledGoogleConfiguration {
+            await connectGoogle(clientID: config.clientID, clientSecret: config.clientSecret)
+            return
+        }
         do {
-            let secret = try SecretStore.get("google.clientSecret") ?? ""
+            let secret = try await SecretStore.get("google.clientSecret") ?? ""
             await connectGoogle(clientID: preferences.googleClientID, clientSecret: secret)
         } catch { self.error = connectionMessage(error) }
     }
@@ -270,35 +275,43 @@ final class AppState: ObservableObject {
         return try? GoogleOAuthConfiguration(clientID: id,
             clientSecret: Bundle.main.object(forInfoDictionaryKey: "HoldletGoogleClientSecret") as? String ?? "")
     }
+    func retryGoogleAccess() {
+        updatePreferences { $0.googleAccessPaused = false }
+        Task { await sync() }
+    }
     func connectSlack(token: String, query: String) async {
         do {
             let items = try await SlackConnector.fetch(token: token, query: query)
-            try SecretStore.set(token, for: "slack.token")
+            try await SecretStore.set(token, for: "slack.token")
             updatePreferences { $0.slackEnabled = true; $0.slackQuery = query }
             merge(items, source: .slack); markSuccess(.slack); save(); reconcile()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = connectionMessage(error) }
     }
     func connectJira(site: String, email: String, token: String) async {
         do {
             let items = try await JiraConnector.fetch(site: site, email: email, token: token, scope: preferences.jiraScope ?? .involved, scopedToken: preferences.jiraScopedToken ?? false)
-            try SecretStore.set(token, for: "jira.token")
+            try await SecretStore.set(token, for: "jira.token")
             updatePreferences { $0.jiraEnabled = true; $0.jiraSite = site; $0.jiraEmail = email }
             merge(items, source: .jira); markSuccess(.jira); save(); reconcile()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = connectionMessage(error) }
     }
     func disconnect(_ source: Source) {
         generation += 1
+        if source == .google || source == .gmail { googleAuth.cancel() }
+        Task { await finishDisconnect(source) }
+    }
+    private func finishDisconnect(_ source: Source) async {
         do {
             let sources: Set<Source>
             switch source {
             case .google, .gmail:
                 gmailNextPageToken = nil; gmailMatchingIDs = nil; gmailHistoryID = nil; syncedGmailQuery = nil
-                googleAuth.cancel(); try SecretStore.delete("google.tokens"); try SecretStore.delete("google.clientSecret")
+                googleAuth.cancel(); try await SecretStore.delete("google.tokens"); try await SecretStore.delete("google.clientSecret")
                 snapshot.preferences.googleEnabled = false; snapshot.preferences.googleCalendarEnabled = false
                 snapshot.preferences.googleClientID = ""; sources = [.google, .gmail]
-            case .slack: try SecretStore.delete("slack.token"); snapshot.preferences.slackEnabled = false; sources = [.slack]
+            case .slack: try await SecretStore.delete("slack.token"); snapshot.preferences.slackEnabled = false; sources = [.slack]
             case .jira:
-                try SecretStore.delete("jira.token"); snapshot.preferences.jiraEnabled = false
+                try await SecretStore.delete("jira.token"); snapshot.preferences.jiraEnabled = false
                 snapshot.preferences.jiraEmail = ""; snapshot.preferences.jiraSite = ""; sources = [.jira]
             case .calendar: snapshot.preferences.calendarEnabled = false; sources = [.calendar]
             default: return
@@ -306,7 +319,7 @@ final class AppState: ObservableObject {
             snapshot.items.removeAll { sources.contains($0.source) }
             for value in sources { snapshot.health.removeValue(forKey: value.rawValue) }
             save(); reconcile(); notifications.clearDelivered()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = connectionMessage(error) }
     }
     func setLaunchAtLogin(_ enabled: Bool) {
         do { if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
@@ -315,7 +328,7 @@ final class AppState: ObservableObject {
     }
 
     func sync(mailOnly: Bool = false, onlyIfMailboxChanged: Bool = false) async {
-        guard !isSyncing, !demoInstance else { return }
+        guard !isSyncing, !demoInstance, !googleSigningIn else { return }
         isSyncing = true; defer { isSyncing = false }
         let epoch = generation, prefs = preferences
         if !mailOnly, prefs.calendarEnabled {
@@ -324,7 +337,7 @@ final class AppState: ObservableObject {
                 if epoch == generation { merge(items, source: .calendar); markSuccess(.calendar) }
             } catch { if epoch == generation { markFailure(.calendar, error) } }
         }
-        if prefs.googleEnabled, canRetry(.gmail) || (!mailOnly && canRetry(.google)) {
+        if prefs.googleEnabled, prefs.googleAccessPaused != true, canRetry(.gmail) || (!mailOnly && canRetry(.google)) {
             do {
                 let token = try await googleAuth.accessToken(clientID: prefs.googleClientID)
                 if !mailOnly, prefs.usesGoogleCalendar, canRetry(.google) {
@@ -358,14 +371,14 @@ final class AppState: ObservableObject {
         }
         if !mailOnly, prefs.slackEnabled, canRetry(.slack) {
             do {
-                guard let token = try SecretStore.get("slack.token") else { throw APIError.missingCredentials }
+                guard let token = try await SecretStore.get("slack.token") else { throw APIError.missingCredentials }
                 let items = try await SlackConnector.fetch(token: token, query: prefs.slackQuery)
                 if epoch == generation { merge(items, source: .slack); markSuccess(.slack) }
             } catch { if epoch == generation { markFailure(.slack, error) } }
         }
         if !mailOnly, prefs.jiraEnabled, canRetry(.jira) {
             do {
-                guard let token = try SecretStore.get("jira.token") else { throw APIError.missingCredentials }
+                guard let token = try await SecretStore.get("jira.token") else { throw APIError.missingCredentials }
                 let items = try await JiraConnector.fetch(site: prefs.jiraSite, email: prefs.jiraEmail, token: token, scope: prefs.jiraScope ?? .involved, scopedToken: prefs.jiraScopedToken ?? false)
                 if epoch == generation { merge(items, source: .jira); markSuccess(.jira) }
             } catch { if epoch == generation { markFailure(.jira, error) } }
@@ -402,11 +415,18 @@ final class AppState: ObservableObject {
         retryAfter.removeValue(forKey: source)
     }
     private func markFailure(_ source: Source, _ error: Error) {
+        if [.google, .gmail].contains(source), error is BlockingOperationExecutor.Failure || error is SecretStore.SecretError {
+            snapshot.preferences.googleAccessPaused = true
+        }
         snapshot.health[source.rawValue] = ConnectionHealth(lastSuccess: snapshot.health[source.rawValue]?.lastSuccess,
             message: connectionMessage(error), isError: true)
         if case APIError.rateLimited(let seconds) = error { retryAfter[source] = Date().addingTimeInterval(Double(seconds)) }
     }
     private func connectionMessage(_ error: Error) -> String {
+        if error is BlockingOperationExecutor.Failure || error is SecretStore.SecretError {
+            return text("Keychain is waiting for macOS. Review any Keychain access dialog, then try again. Holdlet remains available while access is pending.",
+                "Keychain macOS yanıtını bekliyor. Varsa Anahtar Zinciri erişim penceresini inceleyip yeniden dene. Beklerken Holdlet kullanılabilir durumda kalır.")
+        }
         if let error = error as? ProviderFailure { return error.message(language: preferences.language) }
         if case APIError.provider("authorization_timed_out") = error {
             return text("Google sign-in timed out. Choose Continue with Google again and finish in the newly opened tab. The old browser tab can be closed.",

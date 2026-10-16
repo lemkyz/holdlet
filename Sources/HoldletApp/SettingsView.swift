@@ -140,7 +140,7 @@ struct SettingsView: View {
                     Text(model.text("This shortcut is unavailable. Another app may already use it; the menu icon and edge handle still work.", "Kısayol kullanılamıyor. Başka bir uygulama kullanıyor olabilir; menü simgesi ve tutamak çalışmaya devam eder.")).font(.caption).foregroundStyle(.secondary)
                 }
                 Toggle(model.text("Show sample data", "Örnek verileri göster"), isOn: preference(\.demoMode))
-                Text("Holdlet 0.2.2-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
+                Text("Holdlet 0.2.3-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
             } header: { Text(model.text("Preferences", "Tercihler")) }
         }.formStyle(.grouped)
     }
@@ -208,6 +208,11 @@ struct SettingsView: View {
             Section {
                 connectionStatus(.gmail)
                 if model.preferences.googleEnabled {
+                    if model.preferences.googleAccessPaused == true {
+                        Text(model.text("Google checks are paused until Keychain access is resolved. No repeated password requests are made in the background.",
+                            "Keychain erişimi çözülene kadar Google kontrolü duraklatıldı. Arka planda tekrar tekrar parola istenmez.")).font(.caption)
+                        Button(model.text("Retry Keychain access", "Keychain erişimini yeniden dene")) { model.retryGoogleAccess() }
+                    }
                     Button(model.text("Sign in again", "Yeniden giriş yap")) { Task { await model.reconnectGoogle() } }.disabled(model.googleSigningIn)
                     Toggle(model.text("Also use direct Google Calendar", "Doğrudan Google Takvim'i de kullan"), isOn: Binding(get: { model.preferences.usesGoogleCalendar }, set: { model.useGoogleCalendar($0) }))
                     Button(model.text("Disconnect Gmail", "Gmail bağlantısını kaldır")) { model.disconnect(.gmail) }

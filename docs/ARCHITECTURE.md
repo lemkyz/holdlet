@@ -36,7 +36,7 @@ The OS controls notification presentation and sleep behavior. No Critical Alert 
 
 ## Security boundaries
 
-- Provider credentials use Keychain's `WhenUnlockedThisDeviceOnly` access class.
+- Provider credentials use the macOS login Keychain and its authorization/access controls. The code specifies `WhenUnlockedThisDeviceOnly`, but the macOS SDK documents that `kSecAttrAccessible` is enforced for Data Protection/synchronizable keychain items, not ordinary legacy login-keychain items. The current ad-hoc build must not claim a stronger Data Protection access-class guarantee. Stable signing and explicit Data Protection keychain acceptance remain release work.
 - App state is local with mode 0600, in a 0700 directory. No application-level database encryption is claimed.
 - External links accept HTTPS only; meeting links require known service host boundaries, rejecting lookalike domains.
 - Jira sites must be validated `*.atlassian.net` HTTPS URLs without embedded user info or custom port/path. Scoped tokens use only the fixed Atlassian API gateway after cloud-ID validation; tenant discovery never includes credentials.

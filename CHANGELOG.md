@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3-alpha - 2026-10-16
+
+Move Keychain operations off the UI thread. Bound credential-read waiting to eight seconds without queuing repeated requests behind a stalled system authorization dialog. Pause Google background checks after a Keychain access failure until the user explicitly retries. Use an atomic compare-and-replace for refreshed Google tokens, preserving concurrent disconnect behavior. These changes do not unlock, reset or weaken the macOS Keychain.
+
 ## 0.2.2-alpha - 2026-10-16
 
 Keep drawer gaps on one continuous native glass input surface and route padding scroll gestures to the drawer list. Default Gmail to Inbox; add All mail/Unread/Important filters, received dates, unread emphasis and older-page loading. Probe Gmail history every 15 seconds while awake and avoid downloading unchanged mail. Add focused, privacy-aware incoming notifications without alerting on imported old mail. Add an ordinary Jira setup wizard, scoped token gateway support, assigned/reported/watched scope choices and paginated issue search. Extend Google sign-in to fifteen minutes with actionable timeout recovery. This remains a developer alpha; true Gmail push, public provider OAuth and notarization are separate gates.

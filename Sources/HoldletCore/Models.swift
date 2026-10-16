@@ -96,6 +96,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var calendarEnabled = false
     public var googleEnabled = false
     public var googleCalendarEnabled: Bool?
+    public var googleAccessPaused: Bool?
     public var slackEnabled = false
     public var jiraEnabled = false
     public var selectedCalendarIDs: [String] = []
@@ -125,6 +126,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         if enabled { calendarEnabled = false }
     }
     public mutating func connectGoogle(clientID: String) {
+        googleAccessPaused = false
         googleClientID = clientID; googleEnabled = true; googleCalendarEnabled = !calendarEnabled
     }
     public init() {}

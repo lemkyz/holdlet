@@ -98,25 +98,33 @@ final class GoogleAuth {
         let json = try await tokenRequest(fields)
         guard flowID == attempt else { throw CancellationError() }
         guard let access = json["access_token"] as? String, let refresh = json["refresh_token"] as? String else { throw APIError.invalidResponse }
-        if configuration.clientSecret.isEmpty { try SecretStore.delete("google.clientSecret") }
-        else { try SecretStore.set(configuration.clientSecret, for: "google.clientSecret") }
-        try save(GoogleTokens(accessToken: access, refreshToken: refresh,
-                              expiresAt: Date().addingTimeInterval(json["expires_in"] as? Double ?? 3600), clientID: clientID))
+        if configuration.clientSecret.isEmpty { try await SecretStore.delete("google.clientSecret") }
+        else { try await SecretStore.set(configuration.clientSecret, for: "google.clientSecret") }
+        guard flowID == attempt else { throw CancellationError() }
+        let tokens = GoogleTokens(accessToken: access, refreshToken: refresh,
+                                  expiresAt: Date().addingTimeInterval(json["expires_in"] as? Double ?? 3600), clientID: clientID)
+        let saved = String(decoding: try JSONEncoder().encode(tokens), as: UTF8.self)
+        try await SecretStore.set(saved, for: "google.tokens")
+        guard flowID == attempt else {
+            try? await SecretStore.delete("google.tokens", matching: saved)
+            throw CancellationError()
+        }
     }
 
     func accessToken(clientID: String) async throws -> String {
-        guard let raw = try SecretStore.get("google.tokens"), let data = raw.data(using: .utf8),
+        guard let raw = try await SecretStore.get("google.tokens"), let data = raw.data(using: .utf8),
               var tokens = try? JSONDecoder().decode(GoogleTokens.self, from: data) else { throw APIError.missingCredentials }
         guard tokens.clientID == nil || tokens.clientID == clientID else { throw APIError.provider("google_client_changed") }
         if tokens.expiresAt > Date().addingTimeInterval(60) { return tokens.accessToken }
         var fields = ["client_id": clientID, "refresh_token": tokens.refreshToken, "grant_type": "refresh_token"]
-        if let secret = try SecretStore.get("google.clientSecret"), !secret.isEmpty { fields["client_secret"] = secret }
+        if let secret = try await SecretStore.get("google.clientSecret"), !secret.isEmpty { fields["client_secret"] = secret }
         let json = try await tokenRequest(fields)
         guard let access = json["access_token"] as? String else { throw APIError.invalidResponse }
-        guard try SecretStore.get("google.tokens") == raw else { throw CancellationError() }
         tokens.accessToken = access
         tokens.expiresAt = Date().addingTimeInterval(json["expires_in"] as? Double ?? 3600)
-        try save(tokens); return access
+        let updated = String(decoding: try JSONEncoder().encode(tokens), as: UTF8.self)
+        try await SecretStore.replace(updated, for: "google.tokens", matching: raw)
+        return access
     }
 
     func cancel() { flowID = UUID(); finish(.failure(CancellationError())); stop() }
@@ -125,9 +133,6 @@ final class GoogleAuth {
         request.httpMethod = "POST"; request.httpBody = HTTP.form(fields)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         return try await HTTP.json(request)
-    }
-    private func save(_ value: GoogleTokens) throws {
-        try SecretStore.set(String(decoding: JSONEncoder().encode(value), as: UTF8.self), for: "google.tokens")
     }
     private func receiveHeader(_ connection: NWConnection, buffered: Data) {
         guard buffered.count < 16384 else { connection.cancel(); return }
