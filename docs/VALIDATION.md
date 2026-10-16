@@ -51,3 +51,9 @@ A real Desktop client exposed an application-side startup failure before the bro
 52 tests pass locally. New tests exercise the actual production authorization method with an injected browser opener: the real listener reaches readiness, constructs a loopback redirect/PKCE/state URL, can retry after browser-open failure, and cancels after readiness without a token exchange or Keychain writes. These are native socket tests, not HTTP fixture responses. They do not establish Google consent or Gmail API acceptance.
 
 Errors and in-progress Google sign-in are now visible inside the developer-connection sheet rather than being hidden behind it. The local configured package exposes Continue with Google in the normal Connections screen. The generic source/CI build still needs publisher configuration during packaging.
+
+### Sign-in setup timeout recovery
+
+Manual Google consent reached the loopback redirect after the original three-minute wait had expired, leaving Safari unable to connect to the closed listener. The sign-in window now allows fifteen minutes, and a timed-out attempt explains how to start a fresh flow instead of suggesting an unrelated scope change. Old callback tabs cannot resume an expired attempt; retrying creates a new state and PKCE verifier.
+
+53 tests pass locally, including a real-listener expiration followed by a fresh attempt. These checks do not establish live Gmail synchronization.

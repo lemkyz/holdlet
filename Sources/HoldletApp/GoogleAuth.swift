@@ -24,8 +24,11 @@ final class GoogleAuth {
     private var connections: [NWConnection] = []
     private(set) var busy = false
     private let openBrowser: (URL) -> Bool
+    private let authorizationTimeout: Duration
 
-    init(openBrowser: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }) {
+    init(authorizationTimeout: Duration = .seconds(15 * 60),
+         openBrowser: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }) {
+        self.authorizationTimeout = authorizationTimeout
         self.openBrowser = openBrowser
     }
 
@@ -34,8 +37,9 @@ final class GoogleAuth {
         let clientID = configuration.clientID
         let attempt = UUID(); flowID = attempt
         busy = true; defer { busy = false; stop() }
+        let deadline = authorizationTimeout
         timeout = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 180_000_000_000)
+            try? await Task.sleep(for: deadline)
             guard !Task.isCancelled, let self, self.flowID == attempt else { return }
             self.flowID = UUID()
             self.finish(.failure(APIError.provider("authorization_timed_out")))

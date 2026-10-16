@@ -61,4 +61,29 @@ struct GoogleAuthTests {
         #expect(opened)
         #expect(!auth.busy)
     }
+
+    @Test func expiredAttemptReleasesListenerAndAllowsFreshSignIn() async throws {
+        var redirects: [URL] = []
+        let auth = GoogleAuth(authorizationTimeout: .milliseconds(150), openBrowser: { url in
+            redirects.append(url)
+            return redirects.count == 1
+        })
+        let safetyTimeout = cancelAfterFiveSeconds(auth)
+        defer { safetyTimeout.cancel(); auth.cancel() }
+        do {
+            try await auth.authorize(configuration: configuration())
+            Issue.record("Expected the expired sign-in to fail")
+        } catch APIError.provider(let code) {
+            #expect(code == "authorization_timed_out")
+        }
+        #expect(!auth.busy)
+        do {
+            try await auth.authorize(configuration: configuration())
+            Issue.record("Expected the injected browser-open failure on retry")
+        } catch APIError.provider(let code) {
+            #expect(code == "browser_could_not_open")
+        }
+        #expect(redirects.count == 2)
+        #expect(!auth.busy)
+    }
 }

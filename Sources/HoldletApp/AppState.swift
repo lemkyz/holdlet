@@ -361,6 +361,14 @@ final class AppState: ObservableObject {
     }
     private func connectionMessage(_ error: Error) -> String {
         if let error = error as? ProviderFailure { return error.message(language: preferences.language) }
+        if case APIError.provider("authorization_timed_out") = error {
+            return text("Google sign-in timed out. Choose Continue with Google again and finish in the newly opened tab. The old browser tab can be closed.",
+                "Google girişinin bekleme süresi doldu. Google ile devam et düğmesine yeniden basıp yeni açılan sekmede tamamla. Eski tarayıcı sekmesini kapatabilirsin.")
+        }
+        if case APIError.provider("browser_could_not_open") = error {
+            return text("Your browser could not open. Check your default browser, then try Google sign-in again.",
+                "Tarayıcın açılamadı. Varsayılan tarayıcını kontrol edip Google girişini yeniden dene.")
+        }
         if case APIError.provider(let code) = error, code == "calendar_permission_required" || code == "calendar_permission_denied" {
             return text("Calendar access needs approval. Review Calendar permission in Connections, or open macOS Calendar privacy settings.",
                 "Takvim erişim izni gerekiyor. Bağlantılar'da Takvim iznini yenile düğmesini veya macOS Takvim gizlilik ayarlarını kullan.")
