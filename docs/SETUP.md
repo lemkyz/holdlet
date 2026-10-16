@@ -6,7 +6,7 @@ Open **Settings → General → Set up my Mac**. Holdlet requests Calendar/notif
 
 Close Settings: the edge handle and menu icon stay available. Drag the handle to any edge/display, click or scroll inward to open, and use Escape or outward scrolling to hide. Control + Option + H is the default global shortcut. Quitting intentionally stops syncing; automatic start runs at the next login.
 
-No developer project or pasted token is required for everyday use. Public Gmail/Slack/Jira sign-in is unavailable in this preview until publisher registrations are completed. This is separate from Calendar.app support.
+Mac Calendar needs no developer project. Public Google/Slack/Jira browser sign-in still needs publisher setup. Locally configured Google builds support sign-in; Jira offers a personal-token connection wizard in Connections. This is separate from Calendar.app support.
 
 ## Internal developer connections
 
@@ -39,7 +39,7 @@ https://www.googleapis.com/auth/calendar.events.readonly
 https://www.googleapis.com/auth/gmail.readonly
 ```
 
-The Calendar adapter reads only the primary calendar. Gmail searches using your query (default: `is:unread is:important newer_than:7d`) and fetches thread metadata/headers, not full bodies. Gmail `readonly` is broader than metadata-only access: it is requested because query-based search needs it. This distinction is intentional and must be visible during consent.
+The Calendar adapter reads only the primary calendar. Gmail searches using your query (default: `in:inbox`) and fetches thread metadata/headers, not full bodies. Gmail `readonly` is broader than metadata-only access: it is requested because query-based search needs it. This distinction is intentional and must be visible during consent.
 
 Testing-mode refresh-token lifetime and Workspace admin policies can require reauthorization. Public distribution of a shared OAuth app requires Google's applicable verification process; open-source status does not bypass it.
 
@@ -64,13 +64,14 @@ References: [search.messages](https://docs.slack.dev/reference/methods/search.me
 
 ## Jira Cloud - personal token setup
 
-1. Use an **unscoped personal API token** from your Atlassian account. This alpha uses site-based Basic authentication; scoped API gateway tokens need a different adapter and are not supported.
-2. Enter an HTTPS site such as `https://your-company.atlassian.net`, your Atlassian account email and the token.
-3. Select **Test and connect**.
+1. Open **Settings → Connections → Connect Jira**. Enter your organization's HTTPS `*.atlassian.net` address and Atlassian account email.
+2. The wizard links to the [Atlassian token page](https://id.atlassian.com/manage-profile/security/api-tokens). Prefer a scoped Jira token with only issue-reading permission (the classic `read:jira-work` scope, if offered). The account owner must create the credential and paste it into Holdlet, never into chat or an issue.
+3. Keep **Token has Jira read scopes** on for scoped tokens. Holdlet resolves the site's cloud ID without sending a credential, then uses Atlassian's fixed `api.atlassian.com/ex/jira/{cloudId}` gateway. Turn it off for an approved legacy unscoped token.
+4. Choose All my work, Assigned to me, Reported by me, or Watching; select **Connect and fetch my tasks**. All my work includes assigned, reported and watched issues. Only unfinished issues visible to your account are returned.
 
-Query: `assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC, updated DESC`. Reads summary, status and due date via `/rest/api/3/search/jql`. It does not update Jira. Maximum 100 open assigned issues; larger result sets report an error. Date-only due dates are shown at **17:00 in this Mac's time zone**; Jira does not supply a precise time in that field.
+Reads summary, status and due date through `/rest/api/3/search/jql`, follows result pages and deduplicates issues. The defensive limit is 50 pages of 100 issues; exceeding it reports an error and preserves the last successful snapshot. Date-only due dates are shown at **17:00 in this Mac's time zone**. Holdlet does not update Jira. Scoped and unscoped token authority differs; an unscoped token may grant broader access than the app uses. Browser-only OAuth and Data Center are not implemented.
 
-Reference: [Atlassian token authentication](https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/).
+References: [Atlassian token authentication](https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/), [scoped token gateway](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/).
 
 ## Disconnect and revoke
 
@@ -78,4 +79,6 @@ Disconnect removes local records/keys and pending reminders for the source. For 
 
 ## Delivery expectations
 
-Sync is periodic (3 minutes while awake), not push. Calendar.app's own upstream synchronization adds delay. The app keeps the previous snapshot on errors and shows connection health. Narrow queries when result caps are reached. On sleep, the OS controls background execution; on wake the app refreshes and shows open work. Test notification permission, Focus and your usual screen/display configuration. Local reminders remain usable without any connected account.
+Gmail probes for mailbox changes every 15 seconds while awake; other sources sync every 3 minutes. This is polling, not push. Gmail pages contain 50 threads and the Mail view can load older pages; unchanged mailbox checks do not redownload metadata. Inbox, All mail, Unread and Important filters are available. All mail excludes Spam and Trash. Old-page imports do not produce fresh-mail alerts. New-arrival notifications honor local focus, work hours and privacy. Calendar.app's own upstream synchronization adds delay. The app keeps the previous snapshot on errors and shows connection health. Narrow queries when result caps are reached. On sleep, the OS controls background execution; on wake the app refreshes and shows open work. Test notification permission, Focus and your usual screen/display configuration. Local reminders remain usable without any connected account.
+
+True Gmail push needs publisher-managed [Cloud Pub/Sub](https://developers.google.com/workspace/gmail/api/guides/push) infrastructure. A shorter poll interval does not establish push delivery.

@@ -59,15 +59,12 @@ En fazla 100 arama eşleşmesi desteklenir; aşılırsa sorguyu daralt. Yalnızc
 
 ## 4. Jira Cloud
 
-Hazırlayacağın bilgiler: `https://sirketin.atlassian.net` adresi, Atlassian hesap e-postası ve kişisel API tokenı.
+1. Holdlet → Bağlantılar → **Jira'yı bağla** seç. Kurumunun `https://sirketin.atlassian.net` adresini ve Atlassian hesap e-postanı gir.
+2. Ekrandaki bağlantıdan [Atlassian API tokenları](https://id.atlassian.com/manage-profile/security/api-tokens) sayfasını aç. Kurumun izin veriyorsa Jira için salt iş okuma kapsamlı token oluştur; varsa `read:jira-work` seç. Hesap erişimi veren bu kimlik bilgisini kendin oluşturup yalnızca Holdlet'teki güvenli alana yapıştır. Sohbete veya issue'ya yazma.
+3. Kapsamlı token için **Token Jira okuma kapsamlarına sahip** anahtarı açık kalmalı. Eski kapsamsız token kullanıyorsan kapat. Kapsamlı tokenlar Atlassian gateway adresine gider; kurumun cloud ID bilgisi kimlik bilgisi gönderilmeden çözülür.
+4. Tüm işlerim, Bana atananlar, Bildirdiklerim veya Takip ettiklerim seç. **Bağla ve görevlerimi getir** ile bağlantıyı doğrula.
 
-1. [Atlassian API tokenları](https://id.atlassian.com/manage-profile/security/api-tokens) sayfasını aç.
-2. Bu alfadaki site tabanlı bağlantı için **Create API token** yolunu kullan. **Create API token with scopes** ile oluşturulan gateway tokenları bu sürümde desteklenmez. Atlassian genel olarak kapsamlı tokenları önerir; bunlar için ayrı gateway/OAuth desteği yol haritasındadır.
-3. Anlaşılır ad ve deneme sürene uygun son kullanma tarihi seç. Tokenı oluştur ve kopyala.
-4. Holdlet → Tanılama → Geliştirici bağlantıları → Jira Cloud bölümünde siteyi, hesap e-postanı ve tokenı gir.
-5. **Test et ve bağla** seç; sana atanmış açık işlerin ve bağlantı zamanının geldiğini doğrula.
-
-Jira'ya yazma yapılmaz; ancak tokenın sağlayıcıdaki yetkileri yalnızca uygulamanın yaptığı okuma işlemleriyle sınırlanmış değildir. Tamamlanan Jira işi sonraki başarılı eşitlemede aktif listeden çıkar. Tarih alanındaki günler Mac saat diliminde 17:00 olarak gösterilir. Jira Data Center bu bağlayıcıyla çalışmaz.
+Sonuçlar sayfalanır; eşitleme başına güvenlik sınırı 50 sayfa, sayfa başına 100 iştir. Sınır aşılırsa sessizce eksiltmek yerine hata gösterilir. Jira'ya yazma yapılmaz; eski kapsamsız token sağlayıcıda uygulamanın kullandığından geniş yetki verebilir. Tarih alanları Mac saat diliminde 17:00 olarak gösterilir. Jira Data Center ve yayıncıya ait tarayıcı OAuth girişi henüz desteklenmez.
 
 [Atlassian'ın resmî API token rehberi](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/)
 
@@ -79,7 +76,7 @@ Jira'ya yazma yapılmaz; ancak tokenın sağlayıcıdaki yetkileri yalnızca uyg
 - Erteleme ve tamamlandı durumları uygulamayı yeniden açınca korunuyor.
 - Bağlantıyı kaldırınca kaynağın yerel işleri ve gelecekteki uyarıları kaldırılıyor.
 
-Eşitleme Mac uyanıkken yaklaşık 3 dakikada birdir; anlık push değildir. Sonuç sayısı sınırı veya izin hatasında son başarılı veri korunur. Holdlet'ten bağlantıyı kaldırmak sağlayıcıdaki tokenı iptal etmek değildir; tam iptal için sağlayıcının hesap/uygulama ayarlarını da kullan.
+Gmail değişiklikleri Mac uyanıkken 15 saniyede bir kontrol edilir; diğer kaynaklar yaklaşık 3 dakikada bir eşitlenir. Anlık push değildir. Mailler ekranında Gelen kutusu, Tüm mailler, Okunmamış ve Önemli seçilebilir. Tüm mailler Spam ve Çöp Kutusu hariçtir; eski mailler sayfalar halinde yüklenir. Sonuç sayısı sınırı veya izin hatasında son başarılı veri korunur. Holdlet'ten bağlantıyı kaldırmak sağlayıcıdaki tokenı iptal etmek değildir; tam iptal için sağlayıcının hesap/uygulama ayarlarını da kullan.
 
 ## Apple imzası
 

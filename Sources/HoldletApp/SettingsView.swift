@@ -18,6 +18,9 @@ struct SettingsView: View {
     @State private var confirmReset = false
     @State private var importedGoogleClient = false
     @State private var showAdvanced = false
+    @State private var showJiraSetup = false
+    @State private var jiraScope: JiraScope = .involved
+    @State private var jiraScopedToken = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -70,12 +73,15 @@ struct SettingsView: View {
                 developer.disabled(model.demoInstance)
             }.frame(width: 640, height: 620)
         }
+        .sheet(isPresented: $showJiraSetup) { jiraSetup }
         .onAppear {
             googleClientID = model.preferences.googleClientID
             if googleClientID.isEmpty, let bundled = model.bundledGoogleConfiguration {
                 googleClientID = bundled.clientID; googleSecret = bundled.clientSecret
             }
             jiraSite = model.preferences.jiraSite; jiraEmail = model.preferences.jiraEmail
+            jiraScope = model.preferences.jiraScope ?? .involved
+            jiraScopedToken = model.preferences.jiraScopedToken ?? true
             gmailQuery = model.preferences.gmailQuery; slackQuery = model.preferences.slackQuery
             Task { await model.refreshPermissionStatus() }
         }
@@ -134,7 +140,7 @@ struct SettingsView: View {
                     Text(model.text("This shortcut is unavailable. Another app may already use it; the menu icon and edge handle still work.", "Kısayol kullanılamıyor. Başka bir uygulama kullanıyor olabilir; menü simgesi ve tutamak çalışmaya devam eder.")).font(.caption).foregroundStyle(.secondary)
                 }
                 Toggle(model.text("Show sample data", "Örnek verileri göster"), isOn: preference(\.demoMode))
-                Text("Holdlet 0.2.1-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
+                Text("Holdlet 0.2.2-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
             } header: { Text(model.text("Preferences", "Tercihler")) }
         }.formStyle(.grouped)
     }
@@ -212,20 +218,73 @@ struct SettingsView: View {
                     Text(model.text("Gmail sign-in is not available in this preview package. Calendar connections work now. You do not need to create a developer project.",
                         "Bu önizleme paketinde Gmail girişi henüz hazır değil. Takvim bağlantısı kullanılabilir. Bir geliştirici projesi oluşturman gerekmiyor.")).font(.caption).foregroundStyle(.secondary)
                 }
-            } header: { Text(model.text("Important mail", "Önemli mailler")) }
+                Text(model.text("Open Mail in the drawer to choose Inbox, All mail, Unread or Important. Mailbox changes are checked every 15 seconds while awake.",
+                    "Panelde Mailler'i açıp Gelen kutusu, Tüm mailler, Okunmamış veya Önemli seçebilirsin. Mac uyanıkken değişiklikler 15 saniyede bir kontrol edilir.")).font(.caption).foregroundStyle(.secondary)
+            } header: { Text(model.text("Mail", "Mailler")) }
             Section {
                 connectionStatus(.slack)
                 if model.preferences.slackEnabled { Button(model.text("Disconnect Slack", "Slack bağlantısını kaldır")) { model.disconnect(.slack) } }
                 else { Text(model.text("Workspace sign-in is waiting for the publisher's Slack application. Your organization may need to approve it.",
                     "Çalışma alanıyla giriş için yayıncının Slack uygulaması gerekiyor. Kuruluşun ayrıca onay isteyebilir.")).font(.caption).foregroundStyle(.secondary) }
                 connectionStatus(.jira)
-                if model.preferences.jiraEnabled { Button(model.text("Disconnect Jira", "Jira bağlantısını kaldır")) { model.disconnect(.jira) } }
-                else { Text(model.text("Jira account sign-in is pending publisher registration. Internal developer connections are available under Advanced.",
-                    "Jira hesap girişi yayıncı kaydını bekliyor. Kurum içi geliştirici bağlantıları Gelişmiş bölümünde.")).font(.caption).foregroundStyle(.secondary) }
+                if model.preferences.jiraEnabled {
+                    Picker(model.text("Tasks", "Görevler"), selection: Binding(get: { model.preferences.jiraScope ?? .involved }, set: { scope in
+                        model.updatePreferences { $0.jiraScope = scope }; Task { await model.sync() }
+                    })) { jiraScopeOptions }
+                    Button(model.text("Disconnect Jira", "Jira bağlantısını kaldır")) { model.disconnect(.jira) }
+                }
+                else {
+                    Button(model.text("Connect Jira", "Jira'yı bağla")) { model.error = nil; showJiraSetup = true }
+                    Text(model.text("Connect your organization's Jira Cloud with an approved API token. Browser-only account sign-in is still pending publisher registration.",
+                        "Kurumunun izin verdiği API tokenıyla Jira Cloud'u bağlayabilirsin. Yalnızca tarayıcı hesabıyla giriş için yayıncı kaydı henüz hazır değil.")).font(.caption).foregroundStyle(.secondary)
+                }
             } header: { Text(model.text("Workspace", "Çalışma alanı")) }
         }.formStyle(.grouped)
     }
 
+    private var jiraSetup: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(model.text("Connect Jira", "Jira'yı bağla")).font(.system(size: 22, weight: .medium))
+                Spacer()
+                Button(model.text("Close", "Kapat")) { jiraToken = ""; showJiraSetup = false }.disabled(connecting)
+            }
+            Text(model.text("Read unfinished issues assigned to you, reported by you or watched by you. Holdlet does not change tasks. Use only a token approved by your organization.",
+                "Sana atanan, bildirdiğin veya takip ettiğin açık işleri okur. Holdlet görevleri değiştirmez. Yalnızca kurumunun izin verdiği tokenı kullan."))
+                .foregroundStyle(.secondary)
+            TextField(model.text("Jira address, e.g. https://company.atlassian.net", "Jira adresi, ör. https://kurum.atlassian.net"), text: $jiraSite)
+            TextField(model.text("Atlassian account email", "Atlassian hesap e-postası"), text: $jiraEmail)
+            Picker(model.text("Tasks to show", "Gösterilecek işler"), selection: $jiraScope) { jiraScopeOptions }
+            Toggle(model.text("Token has Jira read scopes", "Token Jira okuma kapsamlarına sahip"), isOn: $jiraScopedToken)
+            SecureField(model.text("Personal API token", "Kişisel API tokenı"), text: $jiraToken)
+            Link(model.text("Open Atlassian API tokens", "Atlassian token sayfasını aç"), destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+            Text(model.text("Create a scoped token for Jira with read-only issue access, then paste it here. If available, use read:jira-work. Legacy unscoped tokens require turning off the switch. The token is stored in macOS Keychain. Never paste it into a chat or issue.",
+                "Jira için yalnızca iş okuma izni olan kapsamlı token oluşturup buraya yapıştır. Varsa read:jira-work seç. Eski kapsamsız token kullanıyorsan anahtarı kapat. Token macOS Keychain'de saklanır. Sohbete veya GitHub issue'suna yazma."))
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            if let error = model.error { Text(error).foregroundStyle(.orange).textSelection(.enabled) }
+            HStack {
+                if connecting { ProgressView().controlSize(.small) }
+                Button(model.text("Connect and fetch my tasks", "Bağla ve görevlerimi getir")) {
+                    connecting = true; model.error = nil
+                    Task {
+                        model.updatePreferences { $0.jiraScope = jiraScope; $0.jiraScopedToken = jiraScopedToken }
+                        await model.connectJira(site: jiraSite, email: jiraEmail, token: jiraToken)
+                        jiraToken = ""; connecting = false
+                        if model.preferences.jiraEnabled { showJiraSetup = false }
+                    }
+                }.disabled(connecting || jiraSite.isEmpty || jiraEmail.isEmpty || jiraToken.isEmpty)
+            }
+        }.textFieldStyle(.roundedBorder).padding(24).frame(width: 540)
+        .onDisappear { jiraToken = "" }
+    }
+    private var jiraScopeOptions: some View {
+        Group {
+            Text(model.text("All my work", "Tüm işlerim")).tag(JiraScope.involved)
+            Text(model.text("Assigned to me", "Bana atananlar")).tag(JiraScope.assigned)
+            Text(model.text("Reported by me", "Bildirdiklerim")).tag(JiraScope.reported)
+            Text(model.text("Watching", "Takip ettiklerim")).tag(JiraScope.watching)
+        }
+    }
     private var developer: some View {
         Form {
             Section {
@@ -321,14 +380,15 @@ struct SettingsView: View {
                 } else {
                     TextField("https://your-company.atlassian.net", text: $jiraSite)
                     TextField(model.text("Atlassian account email", "Atlassian hesap e-postası"), text: $jiraEmail)
-                    SecureField(model.text("Unscoped personal API token", "Kapsamsız kişisel API tokenı"), text: $jiraToken)
+                    Toggle(model.text("Token has Jira read scopes", "Token Jira okuma kapsamlarına sahip"), isOn: $jiraScopedToken)
+                    SecureField(model.text("Personal API token", "Kişisel API tokenı"), text: $jiraToken)
                     Button(model.text("Test and connect", "Test et ve bağla")) {
                         connecting = true
-                        Task { await model.connectJira(site: jiraSite, email: jiraEmail, token: jiraToken); jiraToken = ""; connecting = false }
+                        Task { model.updatePreferences { $0.jiraScopedToken = jiraScopedToken }; await model.connectJira(site: jiraSite, email: jiraEmail, token: jiraToken); jiraToken = ""; connecting = false }
                     }.disabled(connecting || jiraSite.isEmpty || jiraEmail.isEmpty || jiraToken.isEmpty)
                 }
-                Text(model.text("Jira Cloud only. Personal API token setup for alpha; scoped gateway tokens and Data Center are not supported. Reads your first 100 unfinished assigned issues. No Jira writes.",
-                    "Yalnızca Jira Cloud. Alfa için kişisel API tokenı; kapsamlı gateway tokenları ve Data Center desteklenmez. Sana atanmış en fazla 100 açık işi okur. Jira'ya yazmaz.")).font(.caption)
+                Text(model.text("Jira Cloud only. Scoped read tokens and approved legacy tokens are supported. Paginates unfinished issues in your selected scope, up to 5,000 per sync. Data Center and browser OAuth are not implemented. No Jira writes.",
+                    "Yalnızca Jira Cloud. Kapsamlı okuma tokenları ve onaylı eski tokenlar desteklenir. Seçtiğin kapsamdaki açık işleri sayfalar; eşitleme başına üst sınır 5.000 iş. Data Center ve tarayıcı OAuth girişi hazır değil. Jira'ya yazmaz.")).font(.caption)
             } header: { Text("Jira Cloud") }
         }.formStyle(.grouped)
     }
@@ -356,11 +416,12 @@ struct SettingsView: View {
                 TextField(model.text("Gmail search query", "Gmail arama sorgusu"), text: $gmailQuery)
                 TextField(model.text("Slack search query", "Slack arama sorgusu"), text: $slackQuery)
                 Button(model.text("Save search rules", "Arama kurallarını kaydet")) {
-                    model.updatePreferences { $0.gmailQuery = gmailQuery; $0.slackQuery = slackQuery }
+                    model.updatePreferences { $0.slackQuery = slackQuery }
+                    model.setGmailQuery(gmailQuery)
                     Task { await model.sync() }
                 }
-                Text(model.text("Gmail: unread important mail from the last 7 days. Slack: use native search syntax; narrow the query if the service reports too many results. Sync runs every 3 minutes while awake.",
-                    "Gmail: son 7 günün okunmamış önemli mailleri. Slack: kendi arama sözdizimini kullan; çok sonuç varsa sorguyu daralt. Mac uyanıkken 3 dakikada bir eşitlenir.")).font(.caption)
+                Text(model.text("Gmail shows your inbox by default, checks changes every 15 seconds while awake and loads older mail on demand. Slack and other sources sync every 3 minutes.",
+                    "Gmail varsayılan olarak gelen kutunu gösterir; Mac uyanıkken 15 saniyede bir değişiklikleri kontrol eder, eski mailleri isteğe göre yükler. Slack ve diğer kaynaklar 3 dakikada bir eşitlenir.")).font(.caption)
                 }
             } header: { Text(model.text("What needs attention", "İlgilenilecek işler")) }
             Section {

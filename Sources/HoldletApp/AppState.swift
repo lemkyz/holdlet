@@ -12,6 +12,9 @@ final class AppState: ObservableObject {
     @Published var error: String?
     @Published var notice: String?
     @Published var googleSigningIn = false
+    @Published var gmailNextPageToken: String?
+    @Published var loadingMoreMail = false
+    @Published private var gmailMatchingIDs: Set<String>?
     @Published var notificationStatus = ""
     @Published var notificationsAllowed = false
     @Published var settingsPage = "general"
@@ -28,6 +31,9 @@ final class AppState: ObservableObject {
     private let disk: SnapshotStore
     private var clock: Timer?
     private var poll: Timer?
+    private var mailPoll: Timer?
+    private var gmailHistoryID: String?
+    private var syncedGmailQuery: String?
     private var generation = 0
     private var readOnly = false
     private var retryAfter: [Source: Date] = [:]
@@ -46,6 +52,9 @@ final class AppState: ObservableObject {
         notifications = NotificationService(defaults: defaults)
         do { snapshot = demoInstance ? Snapshot() : try disk.load() }
         catch { snapshot = Snapshot(); self.error = "Saved data could not be read. The original file is preserved. Open Settings → Diagnostics."; readOnly = true }
+        if !demoInstance && snapshot.preferences.gmailQuery == "is:unread is:important newer_than:7d" {
+            snapshot.preferences.gmailQuery = "in:inbox"
+        }
         if demoInstance { snapshot.preferences.demoMode = true; snapshot.preferences.onboardingComplete = true }
         if snapshot.preferences.demoMode { makeDemoItems() }
         notifications.onOpen = { [weak self] id in
@@ -57,6 +66,9 @@ final class AppState: ObservableObject {
         }
         poll = Timer.scheduledTimer(withTimeInterval: 180, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.sync() }
+        }
+        mailPoll = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.sync(mailOnly: true, onlyIfMailboxChanged: true) }
         }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
@@ -79,6 +91,31 @@ final class AppState: ObservableObject {
     var active: [AttentionItem] { AttentionEngine.prioritized(allItems, now: now) }
     var nextMeeting: AttentionItem? { AttentionEngine.nextMeeting(allItems, now: now) }
     var openWork: [AttentionItem] { active.filter { $0.kind != .meeting } }
+    var mailItems: [AttentionItem] {
+        allItems.filter { $0.kind == .mail && ($0.isDemo || ($0.source == .gmail && (gmailMatchingIDs == nil || gmailMatchingIDs!.contains($0.id)))) }
+            .sorted { ($0.receivedAt ?? $0.createdAt) > ($1.receivedAt ?? $1.createdAt) }
+    }
+    func setGmailQuery(_ query: String) {
+        guard query != preferences.gmailQuery else { return }
+        updatePreferences { $0.gmailQuery = query }
+        gmailHistoryID = nil; syncedGmailQuery = nil; gmailNextPageToken = nil; gmailMatchingIDs = []
+        Task { await sync(mailOnly: true) }
+    }
+    func loadMoreMail() async {
+        guard let cursor = gmailNextPageToken, !loadingMoreMail, !isSyncing else { return }
+        loadingMoreMail = true; isSyncing = true
+        defer { loadingMoreMail = false; isSyncing = false }
+        let epoch = generation, query = preferences.gmailQuery
+        do {
+            let token = try await googleAuth.accessToken(clientID: preferences.googleClientID)
+            let page = try await GoogleConnector.mailPage(token: token, query: query, pageToken: cursor)
+            guard epoch == generation, query == preferences.gmailQuery else { return }
+            merge(page.items, source: .gmail)
+            gmailMatchingIDs = (gmailMatchingIDs ?? []).union(page.items.map(\.id))
+            gmailNextPageToken = page.nextPageToken
+            markSuccess(.gmail); save(); reconcile()
+        } catch { if epoch == generation { self.error = connectionMessage(error) } }
+    }
     var waiting: [AttentionItem] { allItems.filter { $0.state == .waiting } }
     var snoozed: [AttentionItem] { allItems.filter { $0.state != .completed && ($0.snoozedUntil ?? .distantPast) > now } }
     var completed: [AttentionItem] { allItems.filter { $0.state == .completed }.sorted { $0.createdAt > $1.createdAt } }
@@ -243,7 +280,7 @@ final class AppState: ObservableObject {
     }
     func connectJira(site: String, email: String, token: String) async {
         do {
-            let items = try await JiraConnector.fetch(site: site, email: email, token: token)
+            let items = try await JiraConnector.fetch(site: site, email: email, token: token, scope: preferences.jiraScope ?? .involved, scopedToken: preferences.jiraScopedToken ?? false)
             try SecretStore.set(token, for: "jira.token")
             updatePreferences { $0.jiraEnabled = true; $0.jiraSite = site; $0.jiraEmail = email }
             merge(items, source: .jira); markSuccess(.jira); save(); reconcile()
@@ -255,6 +292,7 @@ final class AppState: ObservableObject {
             let sources: Set<Source>
             switch source {
             case .google, .gmail:
+                gmailNextPageToken = nil; gmailMatchingIDs = nil; gmailHistoryID = nil; syncedGmailQuery = nil
                 googleAuth.cancel(); try SecretStore.delete("google.tokens"); try SecretStore.delete("google.clientSecret")
                 snapshot.preferences.googleEnabled = false; snapshot.preferences.googleCalendarEnabled = false
                 snapshot.preferences.googleClientID = ""; sources = [.google, .gmail]
@@ -276,50 +314,59 @@ final class AppState: ObservableObject {
         objectWillChange.send()
     }
 
-    func sync() async {
+    func sync(mailOnly: Bool = false, onlyIfMailboxChanged: Bool = false) async {
         guard !isSyncing, !demoInstance else { return }
         isSyncing = true; defer { isSyncing = false }
         let epoch = generation, prefs = preferences
-        if prefs.calendarEnabled {
+        if !mailOnly, prefs.calendarEnabled {
             do {
                 let items = try calendar.fetch(calendarIDs: prefs.selectedCalendarIDs, now: Date())
                 if epoch == generation { merge(items, source: .calendar); markSuccess(.calendar) }
             } catch { if epoch == generation { markFailure(.calendar, error) } }
         }
-        if prefs.googleEnabled, canRetry(.google) || canRetry(.gmail) {
+        if prefs.googleEnabled, canRetry(.gmail) || (!mailOnly && canRetry(.google)) {
             do {
                 let token = try await googleAuth.accessToken(clientID: prefs.googleClientID)
-                if prefs.usesGoogleCalendar, canRetry(.google) {
+                if !mailOnly, prefs.usesGoogleCalendar, canRetry(.google) {
                     do { let items = try await GoogleConnector.events(token: token, now: Date()); if epoch == generation { merge(items, source: .google); markSuccess(.google) } }
                     catch { if epoch == generation { markFailure(.google, error) } }
                 }
                 if canRetry(.gmail) {
                     do {
-                        let waitingIDs = snapshot.items.filter { $0.source == .gmail && $0.state == .waiting }.map { String($0.id.dropFirst("gmail.".count)) }
-                        guard waitingIDs.count <= 50 else { throw APIError.provider("limit_waiting_threads_to_50") }
-                        let items = try await GoogleConnector.mail(token: token, query: prefs.gmailQuery, waitingThreadIDs: waitingIDs)
-                        if epoch == generation { merge(items, source: .gmail); markSuccess(.gmail) }
+                        let history = try await GoogleConnector.mailboxHistoryID(token: token)
+                        if !onlyIfMailboxChanged || history != gmailHistoryID || prefs.gmailQuery != syncedGmailQuery || snapshot.health[Source.gmail.rawValue]?.isError == true {
+                            let page = try await GoogleConnector.mailPage(token: token, query: prefs.gmailQuery)
+                            let matches = Set(page.items.map(\.id))
+                            let waitingIDs = snapshot.items.filter { $0.source == .gmail && $0.state == .waiting && !matches.contains($0.id) }.map { String($0.id.dropFirst("gmail.".count)) }
+                            let waiting = try await GoogleConnector.mailThreads(token: token, ids: waitingIDs)
+                            if epoch == generation {
+                                merge(page.items + waiting, source: .gmail)
+                                gmailMatchingIDs = matches; gmailNextPageToken = page.nextPageToken
+                                gmailHistoryID = history; syncedGmailQuery = prefs.gmailQuery
+                                markSuccess(.gmail)
+                            }
+                        } else if mailOnly { return }
                     }
                     catch { if epoch == generation { markFailure(.gmail, error) } }
                 }
             } catch {
                 if epoch == generation {
-                    if prefs.usesGoogleCalendar { markFailure(.google, error) }
+                    if !mailOnly, prefs.usesGoogleCalendar { markFailure(.google, error) }
                     markFailure(.gmail, error)
                 }
             }
         }
-        if prefs.slackEnabled, canRetry(.slack) {
+        if !mailOnly, prefs.slackEnabled, canRetry(.slack) {
             do {
                 guard let token = try SecretStore.get("slack.token") else { throw APIError.missingCredentials }
                 let items = try await SlackConnector.fetch(token: token, query: prefs.slackQuery)
                 if epoch == generation { merge(items, source: .slack); markSuccess(.slack) }
             } catch { if epoch == generation { markFailure(.slack, error) } }
         }
-        if prefs.jiraEnabled, canRetry(.jira) {
+        if !mailOnly, prefs.jiraEnabled, canRetry(.jira) {
             do {
                 guard let token = try SecretStore.get("jira.token") else { throw APIError.missingCredentials }
-                let items = try await JiraConnector.fetch(site: prefs.jiraSite, email: prefs.jiraEmail, token: token)
+                let items = try await JiraConnector.fetch(site: prefs.jiraSite, email: prefs.jiraEmail, token: token, scope: prefs.jiraScope ?? .involved, scopedToken: prefs.jiraScopedToken ?? false)
                 if epoch == generation { merge(items, source: .jira); markSuccess(.jira) }
             } catch { if epoch == generation { markFailure(.jira, error) } }
         }

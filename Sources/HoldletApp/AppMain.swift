@@ -39,8 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
         panel.level = .floating; panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true; panel.delegate = self
-        panel.contentView = NSHostingView(rootView: PanelView(model: state))
+        panel.isMovableByWindowBackground = false; panel.delegate = self
+        panel.contentView = PanelHostingView(rootView: PanelView(model: state))
         dock = EdgeDockController(model: state)
         dock?.onToggle = { [weak self] in
             guard let self else { return }

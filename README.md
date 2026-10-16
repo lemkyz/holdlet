@@ -32,11 +32,11 @@ The screenshot is from the running native app with synthetic data. Window-only c
 |---|---|---|
 | Mac Calendar | Selected calendars, next 7 days, timed/non-declined events | macOS Calendar permission |
 | Direct Google Calendar | Primary calendar, next 7 days, up to 250 timed events | Publisher-configured build; developer setup is separate |
-| Gmail | Up to 50 matching threads, plus up to 50 waiting threads | Same Google sign-in; works alongside Mac Calendar |
+| Gmail | Inbox or all-mail filters, 50-thread pages with Load older emails; waiting-thread refresh | Same Google sign-in; works alongside Mac Calendar |
 | Slack | Up to 100 matches for a user-defined search | Internal user OAuth token with `search:read` |
-| Jira Cloud | Up to 100 unfinished issues assigned to you | Site, account email, unscoped personal API token |
+| Jira Cloud | Assigned, reported or watched unfinished issues; paginated up to 5,000 | Connections wizard; scoped read token or legacy personal token |
 
-Sync runs every 3 minutes while the Mac is awake. This is **not push delivery**. Over-limit responses produce a visible error and preserve the previous snapshot. Slack is a personal/internal setup, not a Marketplace-approved public integration. Jira 3LO, multi-account connections, automatic Slack reply detection, all-day events, and phones are not supported yet. See [setup and limitations](docs/SETUP.md).
+Gmail checks the mailbox history ID every 15 seconds while the Mac is awake and refreshes metadata when it changes. Other sources sync every 3 minutes. This is **not push delivery**. Over-limit responses produce a visible error and preserve the previous snapshot. Slack is a personal/internal setup, not a Marketplace-approved public integration. Jira browser OAuth (3LO), multi-account connections, automatic Slack reply detection, all-day events, and phones are not supported yet. See [setup and limitations](docs/SETUP.md).
 
 ## Build and run
 
@@ -70,7 +70,7 @@ The build script signs locally with an **ad-hoc signature** unless `SIGNING_IDEN
 
 Click the pin to keep the drawer visible when clicking elsewhere. Closing the drawer or Settings keeps Holdlet running; **Quit Holdlet** intentionally exits. Automatic start launches it at the next login, not after an intentional quit. Joining opens a link; it does not prove attendance.
 
-Gmail, Slack and Jira are shown with their actual availability. No developer-console work is required by ordinary users. Contributors testing internal integrations can use **Diagnostics → Developer connections** and [the advanced setup guide](docs/SETUP.md).
+Gmail, Slack and Jira are shown with their actual availability. No developer-console work is required by ordinary users. Jira personal-token setup is available in Connections; the wizard links directly to Atlassian and stores tokens in Keychain. Contributors testing other internal integrations can use **Diagnostics → Developer connections** and [the advanced setup guide](docs/SETUP.md).
 
 ## Privacy and reliability
 

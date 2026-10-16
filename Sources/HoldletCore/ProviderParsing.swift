@@ -30,7 +30,9 @@ public enum ProviderParsing {
         return AttentionItem(id: "gmail.\(id)", source: .gmail, kind: .mail,
             title: subject, detail: sender, url: URL(string: "https://mail.google.com/mail/u/0/#all/\(id)"),
             reason: "Matches your Gmail query; reading an email does not complete this follow-up",
-            replyToken: incoming?["id"] as? String)
+            replyToken: incoming?["id"] as? String,
+            receivedAt: (last["internalDate"] as? String).flatMap(Double.init).map { Date(timeIntervalSince1970: $0 / 1000) },
+            isUnread: messages.contains { ($0["labelIds"] as? [String] ?? []).contains("UNREAD") })
     }
 
     public static func slackMatches(_ json: [String: Any]) -> [AttentionItem] {
@@ -55,7 +57,7 @@ public enum ProviderParsing {
             return AttentionItem(id: "jira.\(site.host ?? "").\(key)", source: .jira, kind: .task,
                 title: "\(key) · \(fields["summary"] as? String ?? "Issue")", detail: "Jira · \(status?["name"] as? String ?? "Assigned to you")",
                 dueAt: DateParsing.endOfDay(fields["duedate"] as? String, calendar: calendar),
-                url: site.appendingPathComponent("browse").appendingPathComponent(key), reason: "Assigned to you and not in a Done status")
+                url: site.appendingPathComponent("browse").appendingPathComponent(key), reason: "Matches your Jira scope and is not in a Done status")
         }
     }
 }

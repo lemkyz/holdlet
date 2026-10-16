@@ -20,9 +20,9 @@ Değerlendirme tarihi: 16 Ekim 2026. Sonuç: kontrollü geliştirici demosu içi
 
 1. **İlk sürümün kapsamını daralt:** Takvim, Gmail ve kişisel takipler için açık ürün sözü. Slack/Jira ve Microsoft 365 hazır görünmemeli; genel kurumsal kapsam ayrı bir hedef.
 2. **Standart Google girişi:** Yayıncıya ait onaylı yapılandırma, gerekli Google doğrulama süreci ve dağıtılan pakette giriş. Yeni kullanıcı geliştirici projesi veya test listesi düzenlememeli. Token yenileme, iptal, izin geri alma ve hesap değiştirme gerçek hesaplarla denenmeli.
-3. **Güvenilir Mac kurulumu:** Developer ID imzası, notarization, temiz Mac kurulumu ve güncellemede izinlerin korunması. Son kaynak düzeltmeleri yeni ve açıkça sürümlenmiş bir indirme paketine girmeli. v0.2.1-alpha paketi son zaman aşımı düzeltmesinden önce oluşturuldu.
+3. **Güvenilir Mac kurulumu:** Developer ID imzası, notarization, temiz Mac kurulumu ve güncellemede izinlerin korunması. Son kaynak düzeltmeleri yeni ve açıkça sürümlenmiş bir indirme paketine girmeli. v0.2.1-alpha paketi son zaman aşımı düzeltmesinden önce oluşturuldu; 0.2.2 kaynakları bunu ve mail/kaydırma iyileştirmelerini içerir.
 4. **Güvenilir günlük kullanım:** Gerçek oturum açılışı, pencere kapatma, yeniden başlatma, uyku/uyanma, bağlantı kopması, 401/403/429 ve sistem Odak modu. Birkaç günlük pilot ve gerçek bildirim teslimi kaydı.
-5. **Yoğun hesaplar ve veri ömrü:** Sayfalama ve saklama sınırları. Şu anda Gmail 50 eşleşen ve 50 bekleyen iş parçacığı, doğrudan Google Takvim 250 etkinlik, Slack/Jira 100 sonuç sınırına sahip. Limit aşımı hata verir ve son başarılı görünümü korur. Eski takiplerin saklanmasına henüz genel bir süre sınırı uygulanmıyor.
+5. **Yoğun hesaplar ve veri ömrü:** Sayfalama ve saklama sınırları. 0.2.2 ile Gmail 50 konuşmalık sayfalar halinde yüklenir; Jira 100 sonuçluk sayfalarla 5.000 işe kadar okunur. Doğrudan Google Takvim 250 etkinlik, Slack 100 sonuç sınırına sahip. Limit aşımı hata verir ve son başarılı görünümü korur. Eski takiplerin saklanmasına henüz genel bir süre sınırı uygulanmıyor.
 6. **Son tasarım kabulü:** Açık/koyu ve hareketli duvar kâğıdı üzerinde kontrast; uzun Türkçe/İngilizce metin; küçük ekran; boş, yükleniyor, çevrimdışı ve hata durumları; klavye, VoiceOver, Saydamlığı Azalt ve Hareketi Azalt. README görseli yalnızca sentetik demodur, tüm kabulün yerine geçmez.
 7. **Güvenlik ve destek:** Aşağıdaki veri saklama kararları, güvenlik incelemesi, gizlilik açıklaması, veri silme/erişim iptali yönlendirmesi ve güncelleme politikası.
 
@@ -38,6 +38,6 @@ Bağlantıyı kaldırmak yerel kimlik bilgilerini siler; sağlayıcıdaki izni i
 
 “Mac için açık kaynak toplantı ve takip yardımcısı. Ekran kenarında kalır. Mac Takvim ve yapılandırılmış Google test bağlantısıyla çalışan geliştirici önizlemesi.”
 
-“Tüm şirketlerde hazır”, “anlık bildirim”, “hiçbir toplantıyı kaçırmaz”, “güvenlik denetiminden geçti” veya “genel kullanıma tamamen hazır” denmemeli. Mevcut senkronizasyon Mac uyanıkken üç dakikada birdir; push değildir. Mac kapalıyken canlı kaynak takibi yapılamaz.
+“Tüm şirketlerde hazır”, “anlık bildirim”, “hiçbir toplantıyı kaçırmaz”, “güvenlik denetiminden geçti” veya “genel kullanıma tamamen hazır” denmemeli. 0.2.2 ile Gmail değişiklik kontrolü Mac uyanıkken 15 saniyede bir, diğer kaynakların eşitlemesi üç dakikada birdir; push değildir. Mac kapalıyken canlı kaynak takibi yapılamaz.
 
 İlgili kanıtlar: [doğrulama](VALIDATION.md), [bağlantı durumu](STATUS.md), [yol haritası](ROADMAP.md), [güvenlik](../SECURITY.md), [yayın adımları](RELEASING.md).

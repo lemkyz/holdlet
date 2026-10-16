@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2-alpha - 2026-10-16
+
+Keep drawer gaps on one continuous native glass input surface and route padding scroll gestures to the drawer list. Default Gmail to Inbox; add All mail/Unread/Important filters, received dates, unread emphasis and older-page loading. Probe Gmail history every 15 seconds while awake and avoid downloading unchanged mail. Add focused, privacy-aware incoming notifications without alerting on imported old mail. Add an ordinary Jira setup wizard, scoped token gateway support, assigned/reported/watched scope choices and paginated issue search. Extend Google sign-in to fifteen minutes with actionable timeout recovery. This remains a developer alpha; true Gmail push, public provider OAuth and notarization are separate gates.
+
 ## 0.1.2-alpha - 2026-10-15
 
 Replace the unexplained disabled Google sign-in button with an explicit setup action and Desktop client JSON import. Keep Gmail connected when using Mac Calendar; make direct Google Calendar a separate choice. Decode OAuth/API errors into actionable messages without exposing raw remote descriptions. Handle fragmented loopback requests and canceled authorization attempts. Add configuration, migration and HTTP-client tests. Remove long dash characters from repository prose and clarify which connections still require live-account acceptance.

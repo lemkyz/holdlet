@@ -112,7 +112,7 @@ final class EdgeDockController {
         let eligible = arrivals.filter { ledger[$0.id] == nil }
         guard !eligible.isEmpty else { return }
         for item in eligible { record(item.id) }
-        cue(playSound: model.preferences.dock.sound)
+        cue(playSound: model.preferences.dock.sound && !(model.preferences.notificationsEnabled && model.notificationsAllowed))
     }
     private func checkDeadlines(at date: Date) {
         let cues = AttentionCuePlanner.due(items: model.snapshot.items, preferences: model.preferences, now: date)

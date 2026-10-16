@@ -2,7 +2,7 @@
 
 Toplantılarını, bekleyen dönüşlerini ve işlerini menü çubuğunda takip eden yerel Mac uygulaması. Görsel referans Apple Denetim Merkezi: nötr cam modüller, dairesel ikonlar ve kapsül kontroller.
 
-**0.2 geliştirici önizlemesi.** Ekran kenarı tutamağı, menü çubuğu, Mac Takvim ve yerel takipler kullanılabilir. Herkese açık Gmail, Slack ve Jira girişi yayıncı kayıtlarını bekliyor. Normal kullanıcı ekranında geliştirici kimliği veya token istenmez.
+**0.2 geliştirici önizlemesi.** Ekran kenarı tutamağı, menü çubuğu, Mac Takvim ve yerel takipler kullanılabilir. Herkese açık Gmail, Slack ve Jira girişi yayıncı kayıtlarını bekliyor. Google geliştirici ayarları normal akıştan ayrıdır; Jira için Bağlantılar ekranında kapsamlı kişisel token kurulumu vardır.
 
 ```bash
 git clone https://github.com/lemkyz/holdlet.git
@@ -24,7 +24,7 @@ macOS 14+ ve Swift 6+ gerekir. Yerel paket ad-hoc imzalıdır; Apple Developer I
 - Çalışma günü ve geceye taşan mesai seçilebilir. Saat dilimi bu Mac'i izler.
 - Yeni bağlanan mail kaynağı geçmiş maillerin tümü için uyarı vermez.
 - Tokenlar Keychain'de, iş başlıkları ve ayarlar yerel dosyada tutulur. Dosya uygulama tarafından şifrelenmez.
-- Eşitleme Mac uyanıkken 3 dakikada birdir; push değildir. Bilerek Çık seçersen uygulama kapanır, girişte başlatma bir sonraki oturum açılışında çalışır.
+- Gmail değişiklik kontrolü Mac uyanıkken 15 saniyede bir, diğer kaynakların eşitlemesi 3 dakikada birdir; push değildir. Bilerek Çık seçersen uygulama kapanır, girişte başlatma bir sonraki oturum açılışında çalışır.
 
 Geliştirici olarak kendi hesaplarınla test yapacaksan alanlar **Tanılama → Geliştirici bağlantıları** içindedir. Bunlar normal kurulumun gereği değildir.
 

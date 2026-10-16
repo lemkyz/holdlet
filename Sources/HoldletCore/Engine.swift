@@ -34,6 +34,9 @@ public enum AttentionEngine {
             let a = rank($0, now: now), b = rank($1, now: now)
             if a != b { return a < b }
             if $0.dueAt != $1.dueAt { return ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
+            if $0.receivedAt != $1.receivedAt {
+                return ($0.receivedAt ?? .distantPast) > ($1.receivedAt ?? .distantPast)
+            }
             return $0.id < $1.id
         }
     }

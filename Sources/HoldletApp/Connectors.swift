@@ -39,23 +39,55 @@ enum GoogleConnector {
         guard json["nextPageToken"] == nil else { throw APIError.provider("calendar_window_exceeds_250_events") }
         return ProviderParsing.googleEvents(json)
     }
-    static func mail(token: String, query: String, waitingThreadIDs: [String] = []) async throws -> [AttentionItem] {
-        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw APIError.provider("empty_gmail_query") }
-        let url = try HTTP.url("https://gmail.googleapis.com/gmail/v1/users/me/threads", query: ["q": query, "maxResults": "50"])
-        let json = try await HTTP.json(HTTP.request(url, bearer: token))
-        // Do not silently drop tracked items when a query exceeds the supported window.
-        guard json["nextPageToken"] == nil else { throw APIError.provider("narrow_gmail_query_to_50_threads") }
-        var items: [AttentionItem] = []
-        let matches = (json["threads"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
-        let threadIDs = Array(Set(matches + waitingThreadIDs)).sorted()
-        for id in threadIDs {
-            guard id.allSatisfy({ $0.isHexDigit }) else { continue }
-            let endpoint = try HTTP.url("https://gmail.googleapis.com/gmail/v1/users/me/threads/\(id)", query: ["format": "metadata"])
-            let body = try await HTTP.json(HTTP.request(endpoint, bearer: token))
-            if let item = ProviderParsing.gmailThread(body) { items.append(item) }
-        }
-        return items
+    struct MailPage: Sendable {
+        var items: [AttentionItem]
+        var nextPageToken: String?
     }
+    static func mailboxHistoryID(token: String, session: URLSession = HTTP.session) async throws -> String {
+        let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/profile")!
+        let json = try await HTTP.json(HTTP.request(url, bearer: token), session: session)
+        guard let history = json["historyId"] as? String else { throw APIError.invalidResponse }
+        return history
+    }
+    static func mailPage(token: String, query: String, pageToken: String? = nil,
+                         session: URLSession = HTTP.session) async throws -> MailPage {
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw APIError.provider("empty_gmail_query") }
+        var fields = ["q": query, "maxResults": "50"]
+        if let pageToken { fields["pageToken"] = pageToken }
+        let url = try HTTP.url("https://gmail.googleapis.com/gmail/v1/users/me/threads", query: fields)
+        let json = try await HTTP.json(HTTP.request(url, bearer: token), session: session)
+        let ids = (json["threads"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+        return MailPage(items: try await mailThreads(token: token, ids: ids, session: session),
+                        nextPageToken: json["nextPageToken"] as? String)
+    }
+    static func mailThreads(token: String, ids: [String], session: URLSession = HTTP.session) async throws -> [AttentionItem] {
+        let ids = Array(Set(ids)).sorted()
+        guard ids.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isHexDigit) }) else { throw APIError.invalidResponse }
+        var items: [AttentionItem] = []
+        // Bounded concurrency avoids one network round-trip per thread in sequence.
+        for offset in stride(from: 0, to: ids.count, by: 6) {
+            let batch = Array(ids[offset..<min(offset + 6, ids.count)])
+            let fetched = try await withThrowingTaskGroup(of: AttentionItem?.self) { group in
+                for id in batch {
+                    group.addTask {
+                        let endpoint = try HTTP.url("https://gmail.googleapis.com/gmail/v1/users/me/threads/\(id)", query: ["format": "metadata"])
+                        do {
+                            let body = try await HTTP.json(HTTP.request(endpoint, bearer: token), session: session)
+                            return ProviderParsing.gmailThread(body)
+                        } catch let failure as ProviderFailure where failure.status == 404 {
+                            return nil // A thread may be deleted between listing and reading it.
+                        }
+                    }
+                }
+                var result: [AttentionItem] = []
+                for try await item in group { if let item { result.append(item) } }
+                return result
+            }
+            items += fetched
+        }
+        return items.sorted { ($0.receivedAt ?? $0.createdAt) > ($1.receivedAt ?? $1.createdAt) }
+    }
+
 }
 
 enum SlackConnector {
@@ -86,15 +118,38 @@ enum JiraConnector {
               url.path.isEmpty || url.path == "/" else { throw APIError.invalidURL }
         return url
     }
-    static func fetch(site raw: String, email: String, token: String) async throws -> [AttentionItem] {
+    static func fetch(site raw: String, email: String, token: String, scope: JiraScope = .involved, scopedToken: Bool = false,
+                      session: URLSession = HTTP.session) async throws -> [AttentionItem] {
         let site = try validatedSite(raw)
-        let url = try HTTP.url(site.appendingPathComponent("rest/api/3/search/jql").absoluteString, query: [
-            "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC, updated DESC",
-            "fields": "summary,status,duedate", "maxResults": "100"])
-        var request = HTTP.request(url)
-        request.setValue("Basic \(Data("\(email):\(token)".utf8).base64EncodedString())", forHTTPHeaderField: "Authorization")
-        let json = try await HTTP.json(request)
-        guard (json["isLast"] as? Bool ?? true), json["nextPageToken"] == nil else { throw APIError.provider("jira_window_exceeds_100_issues") }
-        return ProviderParsing.jiraIssues(json, site: site)
+        let base: URL
+        if scopedToken {
+            let tenant = try await HTTP.json(HTTP.request(site.appendingPathComponent("_edge/tenant_info")), session: session)
+            guard let cloudID = tenant["cloudId"] as? String, UUID(uuidString: cloudID) != nil else { throw APIError.invalidResponse }
+            base = URL(string: "https://api.atlassian.com/ex/jira/\(cloudID)")!
+        } else { base = site }
+        var cursor: String?, seen = Set<String>(), items: [AttentionItem] = []
+        for _ in 0..<50 {
+            var fields = ["jql": scope.query,
+                          "fields": "summary,status,duedate", "maxResults": "100"]
+            if let cursor { fields["nextPageToken"] = cursor }
+            let url = try HTTP.url(base.appendingPathComponent("rest/api/3/search/jql").absoluteString, query: fields)
+            var request = HTTP.request(url)
+            request.setValue("Basic \(Data("\(email):\(token)".utf8).base64EncodedString())", forHTTPHeaderField: "Authorization")
+            let json = try await HTTP.json(request, session: session)
+            guard json["issues"] is [[String: Any]] else { throw APIError.invalidResponse }
+            items += ProviderParsing.jiraIssues(json, site: site)
+            if json["isLast"] as? Bool == true { return unique(items) }
+            guard let next = json["nextPageToken"] as? String, !next.isEmpty else {
+                if json["isLast"] as? Bool == false { throw APIError.invalidResponse }
+                return unique(items)
+            }
+            guard seen.insert(next).inserted else { throw APIError.invalidResponse }
+            cursor = next
+        }
+        throw APIError.provider("jira_result_window_too_large")
+    }
+    private static func unique(_ items: [AttentionItem]) -> [AttentionItem] {
+        var seen = Set<String>()
+        return items.filter { seen.insert($0.id).inserted }
     }
 }

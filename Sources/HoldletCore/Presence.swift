@@ -108,7 +108,8 @@ public struct IncomingCueTracker: Sendable {
             .map { AttentionCue(id: Self.fingerprint($0), itemID: $0.id) }
     }
     private static func eligible(_ item: AttentionItem, at now: Date) -> Bool {
-        !item.isDemo && [.gmail, .slack].contains(item.source) && item.state == .active && item.isVisible(at: now)
+        let recentMail = item.source != .gmail || item.receivedAt == nil || item.receivedAt! > now.addingTimeInterval(-120)
+        return recentMail && !item.isDemo && [.gmail, .slack].contains(item.source) && item.state == .active && item.isVisible(at: now)
     }
     private static func fingerprint(_ item: AttentionItem) -> String { "arrival.\(item.id).\(item.replyToken ?? "initial")" }
 }

@@ -29,6 +29,20 @@ public enum Source: String, Codable, CaseIterable, Identifiable, Sendable {
 public enum ItemKind: String, Codable, CaseIterable, Sendable { case meeting, mail, message, task, reminder }
 public enum FollowUpState: String, Codable, CaseIterable, Sendable { case active, waiting, completed }
 
+public enum JiraScope: String, Codable, CaseIterable, Sendable {
+    case involved, assigned, reported, watching
+    public var query: String {
+        let ownership: String
+        switch self {
+        case .involved: ownership = "(assignee = currentUser() OR reporter = currentUser() OR watcher = currentUser())"
+        case .assigned: ownership = "assignee = currentUser()"
+        case .reported: ownership = "reporter = currentUser()"
+        case .watching: ownership = "watcher = currentUser()"
+        }
+        return ownership + " AND statusCategory != Done ORDER BY duedate ASC, updated DESC"
+    }
+}
+
 public struct AttentionItem: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var source: Source
@@ -45,17 +59,21 @@ public struct AttentionItem: Codable, Identifiable, Equatable, Sendable {
     public var createdAt: Date
     public var isDemo: Bool
     public var replyToken: String?
+    public var receivedAt: Date?
+    public var isUnread: Bool?
 
     public init(id: String = UUID().uuidString, source: Source = .local, kind: ItemKind = .reminder,
                 title: String, detail: String = "", dueAt: Date? = nil, endAt: Date? = nil,
                 url: URL? = nil, meetingURL: URL? = nil, reason: String = "Added by you",
                 state: FollowUpState = .active, snoozedUntil: Date? = nil,
-                createdAt: Date = Date(), isDemo: Bool = false, replyToken: String? = nil) {
+                createdAt: Date = Date(), isDemo: Bool = false, replyToken: String? = nil, receivedAt: Date? = nil, isUnread: Bool? = nil) {
         self.id = id; self.source = source; self.kind = kind; self.title = title; self.detail = detail
         self.dueAt = dueAt; self.endAt = endAt; self.url = url; self.meetingURL = meetingURL
         self.reason = reason; self.state = state; self.snoozedUntil = snoozedUntil
         self.createdAt = createdAt; self.isDemo = isDemo
         self.replyToken = replyToken
+        self.receivedAt = receivedAt
+        self.isUnread = isUnread
     }
     public func isVisible(at now: Date) -> Bool {
         state != .completed && (snoozedUntil == nil || snoozedUntil! <= now)
@@ -81,10 +99,12 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var slackEnabled = false
     public var jiraEnabled = false
     public var selectedCalendarIDs: [String] = []
-    public var gmailQuery = "is:unread is:important newer_than:7d"
+    public var gmailQuery = "in:inbox"
     public var slackQuery = "to:me after:{weekAgo}"
     public var jiraSite = ""
     public var jiraEmail = ""
+    public var jiraScope: JiraScope?
+    public var jiraScopedToken: Bool?
     public var googleClientID = ""
     public var workStart = 8
     public var workEnd = 19

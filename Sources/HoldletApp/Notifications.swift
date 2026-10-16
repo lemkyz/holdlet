@@ -9,6 +9,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     private let defaults: UserDefaults
     private var reconciling = false
     private var latestSnapshot: Snapshot?
+    private var incomingTracker = IncomingCueTracker()
     var onOpen: ((String?) -> Void)?
     private var ledger: [String: Double] {
         get { defaults.dictionary(forKey: "notificationLedger") as? [String: Double] ?? [:] }
@@ -47,6 +48,22 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         let existing = Set(pending.map(\.identifier))
         var recorded = ledger.filter { $0.value > now.addingTimeInterval(-30 * 86400).timeIntervalSince1970 }
         for id in obsolete where (recorded[id] ?? 0) > now.timeIntervalSince1970 { recorded.removeValue(forKey: id) }
+        let ready = Set(Source.allCases.filter { snapshot.health[$0.rawValue]?.lastSuccess != nil })
+        let arrivals = incomingTracker.receive(items: snapshot.items, readySources: ready, now: now)
+            .filter { recorded[$0.id] == nil }
+        if snapshot.preferences.notificationsEnabled, (snapshot.focusEndsAt ?? .distantPast) <= now,
+           WorkSchedule.allows(now, preferences: snapshot.preferences) {
+            for arrival in arrivals.prefix(3) {
+                guard let item = snapshot.items.first(where: { $0.id == arrival.itemID }) else { continue }
+                let content = UNMutableNotificationContent()
+                content.title = snapshot.preferences.hideDetails ? "Holdlet" : item.title
+                content.body = snapshot.preferences.hideDetails ? item.source.title : item.detail
+                content.sound = .default; content.threadIdentifier = "holdlet.\(item.source.rawValue)"
+                content.userInfo = ["itemID": item.id]
+                try await center.add(UNNotificationRequest(identifier: "holdlet.\(arrival.id)", content: content, trigger: nil))
+                recorded[arrival.id] = now.timeIntervalSince1970
+            }
+        }
         for plan in plans {
             let alreadyFired = (recorded[plan.id].map { $0 <= now.timeIntervalSince1970 } ?? false)
             if alreadyFired && !existing.contains(plan.id) { continue }

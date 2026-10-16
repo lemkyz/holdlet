@@ -29,7 +29,14 @@ struct PanelView: View {
                         focusCard
                     } else {
                         sectionHeader
+                        if selected == .mail { mailControls }
+                        if selected == .tasks && !model.preferences.jiraEnabled { jiraConnectionHint }
                         workList(items: filteredItems)
+                        if selected == .mail, model.gmailNextPageToken != nil {
+                            Button(model.text("Load older emails", "Eski mailleri yükle")) { Task { await model.loadMoreMail() } }
+                                .buttonStyle(CapsuleAction()).disabled(model.isSyncing || model.loadingMoreMail)
+                            if model.loadingMoreMail { ProgressView().controlSize(.small) }
+                        }
                     }
                     healthFooter
                 }.padding(.horizontal, 1).padding(.bottom, 14)
@@ -37,7 +44,9 @@ struct PanelView: View {
         }
         .padding(14)
         .frame(width: 390).frame(maxHeight: .infinity)
-        .background(Color.clear)
+        .background {
+            NativeGlass().clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
     }
 
     private var header: some View {
@@ -131,8 +140,8 @@ struct PanelView: View {
 
     private var modules: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-            module(symbol: "envelope", title: model.text("Important mail", "Önemli mailler"),
-                detail: "\(model.active.filter { $0.kind == .mail }.count) " + model.text("follow-ups", "takip"), section: .mail)
+            module(symbol: "envelope", title: model.text("Mail", "Mailler"),
+                detail: "\(model.mailItems.count) " + model.text("threads", "konuşma"), section: .mail)
             module(symbol: "checklist", title: model.text("Tasks & messages", "Görev ve mesajlar"),
                 detail: "\(model.active.filter { [.task, .message, .reminder].contains($0.kind) }.count) " + model.text("open items", "açık iş"), section: .tasks)
         }
@@ -175,7 +184,7 @@ struct PanelView: View {
         switch selected {
         case .overview: model.openWork
         case .meetings: model.active.filter { $0.kind == .meeting }
-        case .mail: model.active.filter { $0.kind == .mail }
+        case .mail: model.mailItems
         case .tasks: model.active.filter { [.task, .message, .reminder].contains($0.kind) }
         case .waiting: model.waiting
         case .snoozed: model.snoozed
@@ -186,7 +195,7 @@ struct PanelView: View {
         switch section {
         case .overview: model.text("Overview", "Genel")
         case .meetings: model.text("Meetings", "Toplantılar")
-        case .mail: model.text("Important mail", "Önemli mailler")
+        case .mail: model.text("Mail", "Mailler")
         case .tasks: model.text("Tasks & messages", "Görev ve mesajlar")
         case .waiting: model.text("Waiting for reply", "Yanıt bekleniyor")
         case .snoozed: model.text("Snoozed", "Ertelenenler")
@@ -194,7 +203,7 @@ struct PanelView: View {
         }
     }
     private func workList(items: [AttentionItem]) -> some View {
-        VStack(spacing: 10) {
+        LazyVStack(spacing: 10) {
             if items.isEmpty {
                 Text(model.text("Nothing waiting here.", "Burada bekleyen iş yok."))
                     .font(.system(size: 12)).foregroundStyle(.secondary).padding(20)
@@ -205,11 +214,15 @@ struct PanelView: View {
                     CircleSymbol(symbol: item.source.symbol, size: 33)
                     Button { selectedItem = item } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(model.title(item)).font(.system(size: 13, weight: .medium)).lineLimit(2)
+                            Text(model.title(item)).font(.system(size: 13, weight: item.isUnread == true ? .semibold : .medium)).lineLimit(2)
                             Text(model.detail(item)).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
-                            if let date = item.snoozedUntil ?? item.dueAt {
+                            if let date = item.snoozedUntil ?? item.dueAt ?? item.receivedAt {
                                 Text(date, format: .dateTime.month(.abbreviated).day().hour().minute())
-                                    .font(.system(size: 11)).foregroundStyle(date < model.now ? .orange : .secondary)
+                                    .font(.system(size: 11)).foregroundStyle(item.dueAt != nil && date < model.now ? .orange : .secondary)
+                            }
+                            if selected == .mail, item.state != .active {
+                                Text(item.state == .completed ? model.text("Follow-up complete", "Takip tamamlandı") : model.text("Waiting for reply", "Yanıt bekleniyor"))
+                                    .font(.system(size: 10)).foregroundStyle(.secondary)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                     }.buttonStyle(.plain)
@@ -249,6 +262,32 @@ struct PanelView: View {
         }.padding(18).glassSurface()
     }
 
+    private var mailControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker(model.text("Show", "Göster"), selection: Binding(get: { model.preferences.gmailQuery }, set: { model.setGmailQuery($0) })) {
+                Text(model.text("Inbox", "Gelen kutusu")).tag("in:inbox")
+                Text(model.text("All mail", "Tüm mailler")).tag("-in:spam -in:trash")
+                Text(model.text("Unread", "Okunmamış")).tag("in:inbox is:unread")
+                Text(model.text("Important", "Önemli")).tag("is:important")
+                if !["in:inbox", "-in:spam -in:trash", "in:inbox is:unread", "is:important"].contains(model.preferences.gmailQuery) {
+                    Text(model.text("Custom filter", "Özel filtre")).tag(model.preferences.gmailQuery)
+                }
+            }
+            Text(model.text("Checks for changes every 15 seconds while awake. Load older mail below. Spam and Trash are excluded from All mail.",
+                "Mac uyanıkken değişiklikler 15 saniyede bir kontrol edilir. Eski mailleri aşağıdan yükle. Tüm mailler, Spam ve Çöp Kutusu'nu içermez."))
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+        }.padding(14).glassSurface(radius: 22)
+    }
+    private var jiraConnectionHint: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(model.text("Jira is not connected", "Jira bağlı değil"), systemImage: "link.badge.plus")
+                .font(.system(size: 13, weight: .medium))
+            Text(model.text("Gmail access does not grant Jira access. Connect Jira to read your assigned, reported or watched issues and their actual status.",
+                "Gmail izni Jira erişimi vermez. Sana atanan, bildirdiğin veya takip ettiğin işleri ve gerçek durumlarını okumak için Jira'yı bağla."))
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            Button(model.text("Connect Jira", "Jira'yı bağla")) { model.openConnections() }.buttonStyle(CapsuleAction())
+        }.padding(14).glassSurface(radius: 22)
+    }
     private var addReminder: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(model.text("New reminder", "Yeni hatırlatma")).font(.system(size: 14, weight: .medium))

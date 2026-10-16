@@ -39,7 +39,7 @@ The OS controls notification presentation and sleep behavior. No Critical Alert 
 - Provider credentials use Keychain's `WhenUnlockedThisDeviceOnly` access class.
 - App state is local with mode 0600, in a 0700 directory. No application-level database encryption is claimed.
 - External links accept HTTPS only; meeting links require known service host boundaries, rejecting lookalike domains.
-- Jira credentials are restricted to a validated `*.atlassian.net` HTTPS site without embedded user info or custom port/path.
+- Jira sites must be validated `*.atlassian.net` HTTPS URLs without embedded user info or custom port/path. Scoped tokens use only the fixed Atlassian API gateway after cloud-ID validation; tenant discovery never includes credentials.
 - OAuth binds IPv4 loopback only; state and verifier use cryptographic randomness. Browser callback content is plain text and never echoes credentials.
 - Diagnostics exclude titles, senders, service error bodies, tokens and local account identifiers.
 - No provider content is sent to an LLM, analytics service or Holdlet backend.
