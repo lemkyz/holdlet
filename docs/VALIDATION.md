@@ -11,7 +11,7 @@
 - Normal bundled-app startup passes `./scripts/smoke-app.sh` (on a clean test account); this check caught and prevented a normal-domain UserDefaults startup regression. CI runs it after packaging.
 - Core tests cover merge, cancellation, rescheduling, deduplication, reading-vs-completion, incoming Gmail activity, work hours/time zones/DST, snooze/lead times, notification privacy/capacity, persistence permissions/corruption, link host boundaries and synthetic provider decoding.
 
-Run `./scripts/test.sh` for the exact current test count/results. CI runs the same suite, builds the app and uploads an artifact. Adapters have not been authenticated against the user's real accounts in this session; sample-provider decoding is not evidence of a live integration succeeding.
+Run `./scripts/test.sh` for the exact current test count/results. CI runs the same suite, builds the app and uploads an artifact. Live acceptance is recorded below; sample-provider decoding alone is not evidence of a live integration succeeding.
 
 ## 0.2 evidence
 
@@ -57,3 +57,9 @@ Errors and in-progress Google sign-in are now visible inside the developer-conne
 Manual Google consent reached the loopback redirect after the original three-minute wait had expired, leaving Safari unable to connect to the closed listener. The sign-in window now allows fifteen minutes, and a timed-out attempt explains how to start a fresh flow instead of suggesting an unrelated scope change. Old callback tabs cannot resume an expired attempt; retrying creates a new state and PKCE verifier.
 
 53 tests pass locally, including a real-listener expiration followed by a fresh attempt. These checks do not establish live Gmail synchronization.
+
+### Live acceptance on 16 October 2026
+
+Using the locally configured Desktop OAuth client and a developer-approved Google test account, the user completed consent and the browser reached Holdlet's loopback callback. The application saved the authenticated connection and completed its first real Gmail API synchronization. Both persisted connection health and the Connections screen reported Gmail connected with a successful synchronization at 11:48 Europe/Istanbul. No account identifiers, message content, authorization codes or credentials are included in this evidence.
+
+The existing Mac Calendar connection also completed synchronization after renewing access following the ad-hoc app update. Direct Google Calendar was left disabled to preserve the user's existing calendar selection. Google refresh-token renewal across expiry, public verified Google sign-in, Slack and Jira live acceptance remain unverified. The generic release still does not contain publisher Google configuration.
