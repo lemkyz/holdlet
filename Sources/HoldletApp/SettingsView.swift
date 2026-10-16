@@ -50,6 +50,23 @@ struct SettingsView: View {
         .sheet(isPresented: $showAdvanced) {
             VStack(spacing: 0) {
                 HStack { Text(model.text("Developer connections", "Geliştirici bağlantıları")).font(.headline); Spacer(); Button(model.text("Done", "Bitti")) { showAdvanced = false } }.padding(20)
+                if let error = model.error {
+                    HStack(alignment: .top) {
+                        Image(systemName: "exclamationmark.triangle")
+                        Text(error).textSelection(.enabled)
+                        Spacer()
+                        Button { model.error = nil } label: { Image(systemName: "xmark") }
+                            .accessibilityLabel(model.text("Dismiss error", "Hatayı kapat"))
+                    }.font(.system(size: 12)).padding(12).background(.orange.opacity(0.12))
+                }
+                if model.googleSigningIn {
+                    HStack {
+                        ProgressView().controlSize(.small)
+                        Text(model.text("Complete Google sign-in in your browser.", "Tarayıcıda Google girişini tamamla."))
+                        Spacer()
+                        Button(model.text("Cancel", "İptal")) { model.googleAuth.cancel() }
+                    }.font(.system(size: 12)).padding(12)
+                }
                 developer.disabled(model.demoInstance)
             }.frame(width: 640, height: 620)
         }
@@ -117,7 +134,7 @@ struct SettingsView: View {
                     Text(model.text("This shortcut is unavailable. Another app may already use it; the menu icon and edge handle still work.", "Kısayol kullanılamıyor. Başka bir uygulama kullanıyor olabilir; menü simgesi ve tutamak çalışmaya devam eder.")).font(.caption).foregroundStyle(.secondary)
                 }
                 Toggle(model.text("Show sample data", "Örnek verileri göster"), isOn: preference(\.demoMode))
-                Text("Holdlet 0.2.0-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
+                Text("Holdlet 0.2.1-alpha · macOS 14+").font(.caption).foregroundStyle(.secondary)
             } header: { Text(model.text("Preferences", "Tercihler")) }
         }.formStyle(.grouped)
     }
@@ -426,7 +443,7 @@ struct SettingsView: View {
     private func exportDiagnostics() {
         let panel = NSSavePanel(); panel.nameFieldStringValue = "holdlet-diagnostics.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let data: [String: Any] = ["version": "0.2.0-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
+        let data: [String: Any] = ["version": "0.2.1-alpha", "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "itemCount": model.snapshot.items.count, "sources": model.enabledSources.map { source in
                 ["source": source.rawValue, "hasError": model.snapshot.health[source.rawValue]?.isError ?? false,
                  "lastSuccess": model.snapshot.health[source.rawValue]?.lastSuccess.map { ISO8601DateFormatter().string(from: $0) } ?? "never"] as [String: Any]

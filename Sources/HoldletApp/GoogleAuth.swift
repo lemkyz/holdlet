@@ -23,6 +23,11 @@ final class GoogleAuth {
     private var flowID = UUID()
     private var connections: [NWConnection] = []
     private(set) var busy = false
+    private let openBrowser: (URL) -> Bool
+
+    init(openBrowser: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }) {
+        self.openBrowser = openBrowser
+    }
 
     func authorize(configuration: GoogleOAuthConfiguration) async throws {
         guard !busy else { throw APIError.provider("authorization_in_progress") }
@@ -42,6 +47,15 @@ final class GoogleAuth {
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
         let server = try NWListener(using: parameters)
         listener = server
+        // NWListener fails with EINVAL if it starts without an accept handler.
+        // Install this before waiting for .ready, rather than after readiness.
+        server.newConnectionHandler = { [weak self] connection in
+            connection.start(queue: .main)
+            Task { @MainActor [weak self] in
+                self?.connections.append(connection)
+                self?.receiveHeader(connection, buffered: Data())
+            }
+        }
         let port: UInt16 = try await withCheckedThrowingContinuation { ready in
             readyContinuation = ready
             server.stateUpdateHandler = { [weak self] status in
@@ -63,20 +77,13 @@ final class GoogleAuth {
         receivedCallback = false
         let code: String = try await withCheckedThrowingContinuation { result in
             continuation = result
-            server.newConnectionHandler = { [weak self] connection in
-                connection.start(queue: .main)
-                Task { @MainActor [weak self] in
-                    self?.connections.append(connection)
-                    self?.receiveHeader(connection, buffered: Data())
-                }
-            }
             var parts = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
             let fields = ["client_id": clientID, "redirect_uri": redirect, "response_type": "code",
                 "scope": "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/gmail.readonly",
                 "access_type": "offline", "prompt": "consent", "state": state,
                 "code_challenge": challenge, "code_challenge_method": "S256"]
             parts.queryItems = fields.map { URLQueryItem(name: $0.key, value: $0.value) }
-            guard let url = parts.url, NSWorkspace.shared.open(url) else {
+            guard let url = parts.url, openBrowser(url) else {
                 finish(.failure(APIError.provider("browser_could_not_open"))); return
             }
         }

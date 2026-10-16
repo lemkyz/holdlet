@@ -43,3 +43,11 @@ Run `./scripts/test.sh` for the exact current test count/results. CI runs the sa
 | Accessibility | Keyboard, VoiceOver, Reduce Transparency, Increased Contrast, Reduce Motion |
 
 Apple Silicon is the locally tested architecture. Intel and older supported macOS versions need real-device validation. Performance targets (idle CPU, memory and battery) need Instruments measurements; the project does not claim measured numbers yet.
+
+## 0.2.1 OAuth listener regression
+
+A real Desktop client exposed an application-side startup failure before the browser opened: Network.NWError POSIX EINVAL (22). NWListener was started without a new-connection handler; the handler was assigned only after waiting for readiness. Installing the handler before start fixes the failure while retaining the IPv4 loopback-only bind.
+
+52 tests pass locally. New tests exercise the actual production authorization method with an injected browser opener: the real listener reaches readiness, constructs a loopback redirect/PKCE/state URL, can retry after browser-open failure, and cancels after readiness without a token exchange or Keychain writes. These are native socket tests, not HTTP fixture responses. They do not establish Google consent or Gmail API acceptance.
+
+Errors and in-progress Google sign-in are now visible inside the developer-connection sheet rather than being hidden behind it. The local configured package exposes Continue with Google in the normal Connections screen. The generic source/CI build still needs publisher configuration during packaging.
