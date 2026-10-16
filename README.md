@@ -4,7 +4,7 @@
 <p align="center">A native, open-source Mac companion that keeps meetings and follow-ups at the screen edge.</p>
 <p align="center"><a href="https://github.com/lemkyz/holdlet/actions/workflows/ci.yml">Build & tests</a> · <a href="docs/SETUP.md">Connect your tools</a> · <a href="docs/ROADMAP.md">Roadmap</a> · <a href="docs/README.tr.md">Türkçe</a></p>
 
-**Status: 0.2 developer preview.** The menu bar, screen-edge drawer, Mac Calendar and local workflows are usable now. Public Gmail, Slack and Jira sign-in still require publisher registrations and live-account acceptance. Ordinary setup no longer asks users for developer credentials. See [connection readiness](docs/STATUS.md).
+**Status: 0.2 developer preview.** The menu bar, screen-edge drawer, Mac Calendar and local workflows are usable now. Gmail consent and live synchronization have been verified with an approved test account in a locally configured build. The generic download does not provide public Google sign-in; public Google verification and Slack/Jira OAuth remain release gates. Ordinary setup no longer asks users for developer credentials. See [connection readiness](docs/STATUS.md).
 
 <p align="center"><img src="docs/screenshot.png" width="320" alt="Holdlet native Mac panel showing synthetic demo data"></p>
 

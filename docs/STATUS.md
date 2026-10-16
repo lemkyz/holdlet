@@ -4,15 +4,16 @@
 |---|---|---|
 | Screen edge and setup | Native demo checks: open/close, right-edge selection, Settings remain navigable; pure layout/cue tests | Physical drag, external-display, Spaces and accessibility matrix |
 | Global shortcut | OS registration and accessible availability state | Physical-key acceptance across other foreground apps |
-| Mac Calendar | User confirmed it connects | Broader device/recurrence/permission acceptance |
+| Mac Calendar | Live successful synchronization on 16 October 2026, including access renewal after an ad-hoc update | Broader device/recurrence/permission acceptance |
 | Local reminders, focus, privacy | Native UI checks and core tests | Longer everyday use and notification matrix |
 | Google configuration | Desktop JSON import and configuration/error tests | Publisher-owned OAuth app for ordinary sign-in |
-| Gmail and direct Google Calendar | Adapter/parser/HTTP tests with synthetic data | Successful consent and sync with a real Google account |
+| Gmail | Live Google consent and Gmail API synchronization on 16 October 2026 with the locally configured Desktop client and an approved test account | Public publisher verification, shipped configuration, refresh/revoke/account-switch acceptance |
+| Direct Google Calendar | Adapter/parser/HTTP tests with synthetic data; optional integration remains disabled in the live profile | Successful live API sync and independent calendar-selection acceptance |
 | Slack | Search adapter and synthetic decoding | Allowed workspace user token and live search acceptance |
 | Jira Cloud | Adapter and synthetic decoding | Real site/token and live issue acceptance |
 | Distribution | Local ad-hoc build, app startup and CI | Developer ID signing and notarization |
 
-Google, Slack and Jira are experimental developer connections. A test fixture, a visible button or a successful build does not establish a working account connection.
+Google, Slack and Jira remain experimental developer connections. Gmail live acceptance applies to the configured local app, not the generic downloadable release. A test fixture, a visible button or a successful build does not establish a working account connection. See [launch review in Turkish](LAUNCH-READINESS.tr.md) for release gates.
 
 Google sign-in needs a registered Desktop OAuth application. For internal developer testing, import Google's client JSON under Diagnostics → Developer connections. Ordinary users should not create developer projects. A publisher can configure a shared build using `HOLDLET_GOOGLE_CLIENT_ID` and, where required, `HOLDLET_GOOGLE_CLIENT_SECRET` during packaging. Installed desktop clients are public clients; do not put user tokens in those build settings. Public distribution still needs the provider's applicable consent/verification process.
 
