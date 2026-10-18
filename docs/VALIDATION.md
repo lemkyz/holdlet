@@ -93,3 +93,9 @@ The same locally configured 0.2.3 binary was stopped and relaunched without rebu
 The live Inbox loaded its first 50 threads and another page through the older-mail action, reaching 100 threads. Native input delivered at the drawer's empty left padding moved its own mail list while the drawer remained open. This complements the synthetic AppKit regression test; it does not complete physical trackpad, multi-display or Spaces acceptance. No live incoming-mail alert was induced during this check.
 
 The v0.2.3-alpha release workflow passed all 65 tests and packaging checks. Its generic arm64 archive was checked for archive integrity, version, architecture and absence of publisher Google client configuration. Local account configuration and private mail/calendar content are not included in the release or this evidence.
+
+## Native editing shortcuts
+
+The manually bootstrapped AppKit application had no main Edit menu. During live Jira setup the focused native secure field was empty, while its context menu offered an enabled Paste command. Standard editing shortcuts were missing from the app menu; this prevented the expected Command-V workflow. The context-menu action was left for the account owner, without reading the clipboard or entering their new credential.
+
+The app now installs a localized native application/Edit menu at startup and updates it when the UI language changes. Cut, Copy, Paste, Select All, Undo and Redo use AppKit's responder chain, so the focused field editor handles them. Settings and Quit also have their standard keyboard shortcuts. All 67 tests pass in twelve suites, including English/Turkish menu actions, modifier keys and nil editing targets. These tests verify menu wiring; live keyboard acceptance of the updated binary remains pending. The running configured app has not been replaced during credential entry.

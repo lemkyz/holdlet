@@ -19,11 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var presenceSubscription: AnyCancellable?
     private let shortcut = GlobalShortcut()
     private var shortcutEnabled = false
+    private var menuLanguage: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
         let demo = CommandLine.arguments.contains("--demo")
         state = AppState(demoInstance: demo)
+        updateMainMenu()
         state.showPanel = { [weak self] in self?.showPanel() }
         state.showSettings = { [weak self] in self?.showSettings() }
         state.hidePanel = { [weak self] in self?.panel.orderOut(nil) }
@@ -89,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         } else if panel.isVisible { panel.orderOut(nil) } else { showPanel() }
     }
     @objc private func openFromMenu() { showPanel() }
-    @objc private func settingsFromMenu() { showSettings() }
+    @objc func settingsFromMenu() { showSettings() }
     @objc private func quit() { NSApp.terminate(nil) }
 
     private func showPanel(activate: Bool = true) {
@@ -144,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         else { shortcut.stop(); state.shortcutAvailable = false }
     }
     private func updateStatus() {
+        updateMainMenu()
         guard let button = statusItem.button else { return }
         if let meeting = state.nextMeeting, let date = meeting.dueAt {
             let seconds = date.timeIntervalSinceNow
@@ -153,6 +156,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.title = state.missed > 0 ? " \(state.missed)" : ""
             button.toolTip = "Holdlet"
         }
+    }
+    private func updateMainMenu() {
+        guard menuLanguage != state.preferences.language else { return }
+        menuLanguage = state.preferences.language
+        NSApp.mainMenu = ApplicationMenu.make(text: state.text, settingsTarget: self)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showPanel(); return true }
