@@ -1,6 +1,6 @@
 # Holdlet yayın hazırlığı
 
-Değerlendirme tarihi: 16 Ekim 2026. Sonuç: kontrollü geliştirici demosu için kullanılabilir; genel kullanıcıya hazır ürün veya kurumsal dağıtım olarak sunulamaz. Bu değerlendirme kaynak incelemesi, mevcut test kanıtları, yerel paket kontrolleri ve sınırlı canlı hesap kabulüne dayanır. Bağımsız güvenlik denetimi değildir.
+Değerlendirme tarihi: 18 Ekim 2026. Sonuç: kontrollü geliştirici demosu için kullanılabilir; genel kullanıcıya hazır ürün veya kurumsal dağıtım olarak sunulamaz. Bu değerlendirme kaynak incelemesi, mevcut test kanıtları, yerel paket kontrolleri ve sınırlı canlı hesap kabulüne dayanır. Bağımsız güvenlik denetimi değildir.
 
 ## Mevcut kanıt
 
@@ -9,18 +9,18 @@ Değerlendirme tarihi: 16 Ekim 2026. Sonuç: kontrollü geliştirici demosu içi
 | Menü çubuğu ve ekran kenarı | Uygulandı | Açma, gizleme, kenar seçimi ve temel yerleşim kontrol edildi; fiziksel çoklu ekran ve Spaces matrisi tamamlanmadı |
 | Tasarım | Yerel cam yüzeyler, sistem yazısı ve nötr renkler var | Referans görünüme uygun bir temel; bütün durumlarda okunabilirlik ve erişilebilirlik onayı verilmedi |
 | Mac Takvim | Canlı eşitleme başarılı | Tek kullanıcı ve mevcut Mac; geniş cihaz/hesap matrisi yok |
-| Gmail | Yerel yapılandırılmış uygulamada canlı giriş ve API eşitlemesi başarılı | Google test hesabı; genel indirme paketinde yayıncı yapılandırması yok |
-| Doğrudan Google Takvim | Kod ve sentetik testler var | Kullanıcının Mac Takvim seçimi korundu, canlı doğrudan API kabulü yapılmadı |
+| Gmail | Canlı giriş, aynı paketle yeniden açılış ve 100 konuşmalık iki sayfa yükleme başarılı | Google test hesabı; genel pakette yayıncı yapılandırması ve gerçek yeni mail bildirimi kabulü yok |
+| Doğrudan Google Takvim | Canlı API eşitlemesi ve aynı paketle yeniden açılış başarılı | Birincil takvim boş sonuç döndürdü; bilinen toplantıyla eşleşme henüz doğrulanmadı |
 | Slack ve Jira | Geliştirici bağlantıları mevcut | Genel OAuth ve gerçek kurum kabulü tamamlanmadı |
 | Hatırlatma ve odak | Temel UI ve çekirdek testleri var | Uyku, çevrimdışı kalma, sistem Odak modu ve uzun kullanım matrisi eksik |
-| Testler | 53 test ve son CI kontrolleri başarılı | Canlı bildirim teslimi, pil tüketimi ve tüm kurumsal ağları kanıtlamaz |
+| Testler | 65 test ve v0.2.3-alpha CI kontrolleri başarılı | Canlı bildirim teslimi, pil tüketimi ve tüm kurumsal ağları kanıtlamaz |
 | Dağıtım | Önizleme paket kontrolü geçti | Genel beta kontrolü Developer ID imzası ve noter onayı olmadığı için başarısız |
 
 ## Yayın öncesi zorunlu işler
 
 1. **İlk sürümün kapsamını daralt:** Takvim, Gmail ve kişisel takipler için açık ürün sözü. Slack/Jira ve Microsoft 365 hazır görünmemeli; genel kurumsal kapsam ayrı bir hedef.
 2. **Standart Google girişi:** Yayıncıya ait onaylı yapılandırma, gerekli Google doğrulama süreci ve dağıtılan pakette giriş. Yeni kullanıcı geliştirici projesi veya test listesi düzenlememeli. Token yenileme, iptal, izin geri alma ve hesap değiştirme gerçek hesaplarla denenmeli.
-3. **Güvenilir Mac kurulumu:** Developer ID imzası, notarization, temiz Mac kurulumu ve güncellemede izinlerin korunması. Son kaynak düzeltmeleri yeni ve açıkça sürümlenmiş bir indirme paketine girmeli. v0.2.1-alpha paketi son zaman aşımı düzeltmesinden önce oluşturuldu; 0.2.2 kaynakları bunu ve mail/kaydırma iyileştirmelerini içerir.
+3. **Güvenilir Mac kurulumu:** Developer ID imzası, notarization, temiz Mac kurulumu ve güncellemede izinlerin korunması. v0.2.3-alpha paketi zaman aşımı, mail/kaydırma ve Keychain sırasında arayüzün donması düzeltmelerini içerir. Genel paket yayıncı Google yapılandırması içermez. Yerel yapılandırılmış pakette yeni Google kaydı aynı imzalı dosyayla yeniden açılışta okundu; imza değişen güncellemeler henüz doğrulanmadı.
 4. **Güvenilir günlük kullanım:** Gerçek oturum açılışı, pencere kapatma, yeniden başlatma, uyku/uyanma, bağlantı kopması, 401/403/429 ve sistem Odak modu. Birkaç günlük pilot ve gerçek bildirim teslimi kaydı.
 5. **Yoğun hesaplar ve veri ömrü:** Sayfalama ve saklama sınırları. 0.2.2 ile Gmail 50 konuşmalık sayfalar halinde yüklenir; Jira 100 sonuçluk sayfalarla 5.000 işe kadar okunur. Doğrudan Google Takvim 250 etkinlik, Slack 100 sonuç sınırına sahip. Limit aşımı hata verir ve son başarılı görünümü korur. Eski takiplerin saklanmasına henüz genel bir süre sınırı uygulanmıyor.
 6. **Son tasarım kabulü:** Açık/koyu ve hareketli duvar kâğıdı üzerinde kontrast; uzun Türkçe/İngilizce metin; küçük ekran; boş, yükleniyor, çevrimdışı ve hata durumları; klavye, VoiceOver, Saydamlığı Azalt ve Hareketi Azalt. README görseli yalnızca sentetik demodur, tüm kabulün yerine geçmez.

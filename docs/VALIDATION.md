@@ -83,3 +83,13 @@ All credential operations now run on a dedicated executor. Reads return a bounde
 65 local tests pass in eleven suites, including worker-thread execution, read timeout, busy rejection, safe late completion and executor recovery using synthetic blocked work without touching the user's Keychain. The configured 0.2.3 app launched, opened its panel and navigated Settings while Google Keychain access remained unavailable. The user's Google checks were paused; live Gmail reacceptance and physical trackpad acceptance remain pending. Calendar access may need renewal after the ad-hoc update.
 
 The SDK also clarifies a previous documentation overstatement: kSecAttrAccessible does not provide its Data Protection access-class guarantee for legacy login-keychain items. ARCHITECTURE.md now states the current storage behavior and remaining signing/Data Protection gate accurately.
+
+### Live recovery and drawer acceptance on 18 October 2026
+
+With the account owner's approval, the normal Disconnect action removed only Holdlet's Google credential records and local Google connection state. No default keychain, unrelated credential or Keychain access policy was reset. The user completed a fresh Google consent flow. Persisted service health and the Connections screen then confirmed successful Gmail and direct Google Calendar API synchronization, with Google background access no longer paused.
+
+The same locally configured 0.2.3 binary was stopped and relaunched without rebuilding. Both Google services synchronized successfully again, establishing that the newly saved credential could be read across this restart. This does not establish stable access across a changed ad-hoc signature, token expiry or a signed update. The primary calendar returned no upcoming events, so matching a known meeting remains unverified.
+
+The live Inbox loaded its first 50 threads and another page through the older-mail action, reaching 100 threads. Native input delivered at the drawer's empty left padding moved its own mail list while the drawer remained open. This complements the synthetic AppKit regression test; it does not complete physical trackpad, multi-display or Spaces acceptance. No live incoming-mail alert was induced during this check.
+
+The v0.2.3-alpha release workflow passed all 65 tests and packaging checks. Its generic arm64 archive was checked for archive integrity, version, architecture and absence of publisher Google client configuration. Local account configuration and private mail/calendar content are not included in the release or this evidence.
